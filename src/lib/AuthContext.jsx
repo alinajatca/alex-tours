@@ -1,26 +1,41 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { app } from './firebase';
 
+const auth = getAuth(app);
 const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
-  const [user] = useState({
-    id: "1",
-    full_name: "Admin",
-    email: "admin@alextours.ro",
-    role: "admin"
-  });
+const MANAGER_EMAIL = "alinajatca@gmail.com";
+const NAMES = {
+  "alinajatca@gmail.com": "Alina",
+};
 
-  const navigateToLogin = () => {};
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          id: firebaseUser.uid,
+          email: firebaseUser.email,
+          full_name: NAMES[firebaseUser.email] || firebaseUser.displayName || firebaseUser.email.split("@")[0],
+          isManager: firebaseUser.email === MANAGER_EMAIL,
+        });
+      } else {
+        setUser(null);
+      }
+      setIsLoadingAuth(false);
+    });
+    return unsub;
+  }, []);
+
+  const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
+  const logout = () => signOut(auth);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      isAuthenticated: true,
-      isLoadingAuth: false,
-      isLoadingPublicSettings: false,
-      authError: null,
-      navigateToLogin,
-    }}>
+    <AuthContext.Provider value={{ user, isLoadingAuth, isAuthenticated: !!user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

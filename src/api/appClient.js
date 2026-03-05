@@ -37,6 +37,7 @@ export const appClient = {
   entities: {
     Employee: createEntity("employees"),
     Attendance: createEntity("attendance"),
+    AttendanceEvent: createEntity("attendance_events"),
     Task: createEntity("tasks"),
     Room: createEntity("rooms"),
     Message: createEntity("messages"),
