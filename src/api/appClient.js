@@ -43,5 +43,7 @@ export const appClient = {
     Message: createEntity("messages"),
     File: createEntity("files"),
     ProductivityLog: createEntity("productivity_logs"),
+    CalendarEvent: createEntity("calendar_events"),
+    Client: createEntity("clients"),
   },
 };

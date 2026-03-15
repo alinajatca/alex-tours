@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { app } from "@/lib/firebase";
 import { appClient } from "@/api/appClient";
+import { Shield, Eye, EyeOff } from "lucide-react";
 
 const auth = getAuth(app);
 
@@ -21,9 +22,13 @@ export default function Login() {
   const [department, setDepartment] = useState("Sales");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [gdprAccepted, setGdprAccepted] = useState(false);
+  const [showGdpr, setShowGdpr] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (!gdprAccepted) { setError("Trebuie să accepți politica de confidențialitate!"); return; }
     setLoading(true);
     setError("");
     try {
@@ -37,6 +42,7 @@ export default function Login() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    if (!gdprAccepted) { setError("Trebuie să accepți politica de confidențialitate!"); return; }
     setLoading(true);
     setError("");
     try {
@@ -63,15 +69,13 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl border border-slate-200/60 p-8 w-full max-w-md shadow-sm">
         <div className="flex items-center gap-3 mb-8">
-          <div className="h-10 w-10 bg-blue-600 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-lg">A</span>
-          </div>
+          <img src="/logo.jpg" alt="Alex Tours" className="h-12 w-12 rounded-xl object-cover" />
           <div>
             <h1 className="font-bold text-slate-900">Alex Tours</h1>
-            <p className="text-xs text-slate-500">Virtual Office</p>
+            <p className="text-xs text-slate-500">Birou Virtual</p>
           </div>
         </div>
 
@@ -94,7 +98,14 @@ export default function Login() {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-slate-500">Parolă *</Label>
-            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+            <div className="relative">
+              <Input type={showPassword ? "text" : "password"} value={password}
+                onChange={e => setPassword(e.target.value)} required className="pr-10" />
+              <button type="button" onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
           {isRegister && (
             <>
@@ -102,36 +113,71 @@ export default function Login() {
                 <Label className="text-xs text-slate-500">Rol</Label>
                 <select value={role} onChange={e => setRole(e.target.value)}
                   className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm">
-                  <option value="tour_guide">Tour Guide</option>
-                  <option value="booking_agent">Booking Agent</option>
-                  <option value="customer_support">Customer Support</option>
+                  <option value="tour_guide">Ghid Turistic</option>
+                  <option value="booking_agent">Agent Rezervări</option>
+                  <option value="customer_support">Suport Clienți</option>
                   <option value="marketing">Marketing</option>
-                  <option value="operations">Operations</option>
-                  <option value="finance">Finance</option>
+                  <option value="operations">Operațiuni</option>
+                  <option value="finance">Finanțe</option>
                 </select>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-slate-500">Departament</Label>
                 <select value={department} onChange={e => setDepartment(e.target.value)}
                   className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm">
-                  <option value="Sales">Sales</option>
-                  <option value="Operations">Operations</option>
+                  <option value="Sales">Vânzări</option>
+                  <option value="Operations">Operațiuni</option>
                   <option value="Marketing">Marketing</option>
-                  <option value="Finance">Finance</option>
-                  <option value="Customer Service">Customer Service</option>
+                  <option value="Finance">Finanțe</option>
+                  <option value="Customer Service">Relații Clienți</option>
                 </select>
               </div>
             </>
           )}
-          <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700">
+
+          {/* GDPR */}
+          <div className="flex items-start gap-2 pt-1">
+            <input type="checkbox" id="gdpr" checked={gdprAccepted}
+              onChange={e => setGdprAccepted(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 cursor-pointer"
+              style={{ accentColor: "#00b5b5" }} />
+            <label htmlFor="gdpr" className="text-xs text-slate-500 leading-relaxed cursor-pointer">
+              Am citit și accept{" "}
+              <button type="button" onClick={() => setShowGdpr(!showGdpr)}
+                className="underline font-medium" style={{ color: "#00b5b5" }}>
+                Politica de Confidențialitate
+              </button>
+              {" "}și prelucrarea datelor personale conform GDPR.
+            </label>
+          </div>
+
+          {/* Text GDPR expandabil */}
+          {showGdpr && (
+            <div className="bg-slate-50 rounded-xl p-4 text-xs text-slate-500 space-y-2 max-h-40 overflow-y-auto">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="h-4 w-4 flex-shrink-0" style={{ color: "#00b5b5" }} />
+                <span className="font-semibold text-slate-700">Politica de Confidențialitate</span>
+              </div>
+              <p><strong>Operator:</strong> Alex Tours SRL</p>
+              <p><strong>Date colectate:</strong> nume, adresă de email, ore de lucru, prezență.</p>
+              <p><strong>Scop:</strong> Gestionarea internă a echipei și activităților companiei.</p>
+              <p><strong>Stocare:</strong> Datele sunt stocate securizat prin Firebase (Google Cloud) și nu sunt transmise către terți.</p>
+              <p><strong>Drepturi:</strong> Aveți dreptul de acces, rectificare și ștergere a datelor conform Regulamentului (UE) 2016/679 (GDPR).</p>
+              <p><strong>Contact:</strong> Pentru orice solicitare privind datele personale, contactați managerul aplicației.</p>
+            </div>
+          )}
+
+          <Button type="submit" disabled={loading || !gdprAccepted}
+            className="w-full"
+            style={{ backgroundColor: gdprAccepted ? "#00b5b5" : "#94a3b8" }}>
             {loading ? "Se procesează..." : isRegister ? "Creează cont" : "Intră în cont"}
           </Button>
         </form>
 
         <p className="text-center text-sm text-slate-500 mt-4">
           {isRegister ? "Ai deja cont?" : "Nu ai cont?"}{" "}
-          <button onClick={() => { setIsRegister(!isRegister); setError(""); }}
-            className="text-blue-600 hover:underline font-medium">
+          <button onClick={() => { setIsRegister(!isRegister); setError(""); setGdprAccepted(false); }}
+            className="font-medium hover:underline" style={{ color: "#00b5b5" }}>
             {isRegister ? "Autentifică-te" : "Creează cont"}
           </button>
         </p>

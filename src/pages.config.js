@@ -8,6 +8,8 @@ import Rooms from './pages/Rooms';
 import Files from './pages/Files';
 import VirtualOffice from './pages/VirtualOffice';
 import __Layout from './Layout.jsx';
+import Calendar from "./pages/Calendar";
+import Clients from "./pages/Clients";
 
 export const PAGES = {
     "Dashboard": Dashboard,
@@ -19,6 +21,8 @@ export const PAGES = {
     "Rooms": Rooms,
     "Tasks": Tasks,
     "Files": Files,
+    "Calendar": Calendar,
+    "Clients": Clients,
 }
 
 export const pagesConfig = {

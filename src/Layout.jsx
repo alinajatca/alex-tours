@@ -6,7 +6,8 @@ import { appClient } from "@/api/appClient";
 import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard, Users, BarChart3, CalendarCheck, Menu, X, LogOut,
-  ChevronRight, MessageSquare, Video, CheckSquare, FolderOpen
+  ChevronRight, MessageSquare, Video, CheckSquare, FolderOpen,
+  Calendar, UserCheck
 } from "lucide-react";
 
 const navItems = [
@@ -18,6 +19,8 @@ const navItems = [
   { name: "Panou Principal", icon: BarChart3, page: "Dashboard" },
   { name: "Angajați", icon: Users, page: "Employees" },
   { name: "Prezență", icon: CalendarCheck, page: "Attendance" },
+  { name: "Calendar", icon: Calendar, page: "Calendar" },
+  { name: "Clienți", icon: UserCheck, page: "Clients" },
 ];
 
 const pageNames = {
@@ -30,6 +33,8 @@ const pageNames = {
   Employees: "Angajați",
   Attendance: "Prezență",
   Productivity: "Productivitate",
+  Calendar: "Calendar",
+  Clients: "Clienți",
 };
 
 export default function Layout({ children, currentPageName }) {

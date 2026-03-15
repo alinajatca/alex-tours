@@ -5,7 +5,9 @@ import { motion as Motion } from "framer-motion";
 import AttendanceTable from "../components/attendance/AttendanceTable";
 import { useAuth } from "@/lib/AuthContext";
 import { format } from "date-fns";
-import { CheckCircle, Clock, Coffee, LogOut, PlayCircle, MapPin, Users, Home, AlertCircle } from "lucide-react";
+import { CheckCircle, Clock, Coffee, LogOut, PlayCircle, MapPin, Users, Home, AlertCircle, Download } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const STATUSES = [
   { id: "acasa", label: "Acasă", icon: Home, color: "#00b5b5" },
@@ -54,6 +56,7 @@ export default function Attendance() {
   const queryClient = useQueryClient();
   const [selectedStatus, setSelectedStatus] = useState("acasa");
   const todayStr = new Date().toISOString().split("T")[0];
+  const [exportMonth, setExportMonth] = useState(format(new Date(), "yyyy-MM"));
 
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
@@ -100,7 +103,6 @@ export default function Attendance() {
 
   const logEvent = async (eventType) => {
     const now = format(new Date(), "HH:mm");
-
     await createEventMutation.mutateAsync({
       employee_email: user?.email,
       employee_name: user?.full_name,
@@ -127,36 +129,21 @@ export default function Attendance() {
         });
       }
     }
-
     if (eventType === "break_start" && myEmployee) {
-      await updateEmployeeMutation.mutateAsync({
-        id: myEmployee.id,
-        data: { current_status: "pauza" },
-      });
+      await updateEmployeeMutation.mutateAsync({ id: myEmployee.id, data: { current_status: "pauza" } });
     }
-
     if (eventType === "break_end" && myEmployee) {
-      await updateEmployeeMutation.mutateAsync({
-        id: myEmployee.id,
-        data: { current_status: selectedStatus },
-      });
+      await updateEmployeeMutation.mutateAsync({ id: myEmployee.id, data: { current_status: selectedStatus } });
     }
-
     if (eventType === "check_out" && myEmployee) {
-      await updateEmployeeMutation.mutateAsync({
-        id: myEmployee.id,
-        data: { current_status: "indisponibil" },
-      });
+      await updateEmployeeMutation.mutateAsync({ id: myEmployee.id, data: { current_status: "indisponibil" } });
     }
   };
 
   const handleStatusChange = async (statusId) => {
     setSelectedStatus(statusId);
     if (myEmployee && hasCheckedIn && !hasCheckedOut && !isOnBreak) {
-      await updateEmployeeMutation.mutateAsync({
-        id: myEmployee.id,
-        data: { current_status: statusId },
-      });
+      await updateEmployeeMutation.mutateAsync({ id: myEmployee.id, data: { current_status: statusId } });
     }
   };
 
@@ -173,6 +160,38 @@ export default function Attendance() {
 
   const availableActions = getAvailableActions();
 
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    const monthRecords = records.filter(r => r.date?.startsWith(exportMonth));
+
+    doc.setFontSize(18);
+    doc.setTextColor(0, 181, 181);
+    doc.text("Alex Tours - Raport Prezenta", 14, 20);
+
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Luna: ${exportMonth}`, 14, 30);
+    doc.text(`Generat: ${format(new Date(), "dd.MM.yyyy HH:mm")}`, 14, 37);
+    doc.text(`Total inregistrari: ${monthRecords.length}`, 14, 44);
+
+    autoTable(doc, {
+      startY: 52,
+      head: [["Angajat", "Data", "Check-in", "Status", "Locatie"]],
+      body: monthRecords.map(r => [
+        r.employee_name || "-",
+        r.date || "-",
+        r.check_in || "-",
+        r.status === "present" ? "Prezent" : r.status === "absent" ? "Absent" : r.status || "-",
+        r.work_location || "-",
+      ]),
+      headStyles: { fillColor: [0, 181, 181], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [240, 250, 250] },
+      styles: { fontSize: 10 },
+    });
+
+    doc.save(`prezenta-${exportMonth}.pdf`);
+  };
+
   return (
     <div className="space-y-6">
       {!user?.isManager && (
@@ -183,7 +202,6 @@ export default function Attendance() {
             Ziua Mea de Lucru - {format(new Date(), "d MMMM yyyy")}
           </h3>
 
-          {/* Timeline evenimente */}
           {myTodayEvents.length > 0 && (
             <div className="mb-5 space-y-2">
               {myTodayEvents.map((ev, i) => {
@@ -205,13 +223,12 @@ export default function Attendance() {
             </div>
           )}
 
-          {/* Status locatie */}
           {!hasCheckedOut && (
             <div className="mb-4">
               <p className="text-xs text-slate-500 mb-2">
                 {hasCheckedIn ? "Status curent:" : "Unde lucrezi azi?"}
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {STATUSES.filter(s => s.id !== "pauza").map(s => {
                   const isActive = selectedStatus === s.id;
                   return (
@@ -231,15 +248,13 @@ export default function Attendance() {
             </div>
           )}
 
-          {/* Butoane actiuni */}
           {availableActions.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {availableActions.map(actionId => {
                 const action = EVENTS.find(e => e.id === actionId);
                 if (!action) return null;
                 return (
-                  <button key={actionId}
-                    onClick={() => logEvent(actionId)}
+                  <button key={actionId} onClick={() => logEvent(actionId)}
                     disabled={createEventMutation.isPending}
                     className="flex items-center justify-center gap-2 py-4 rounded-xl font-semibold text-sm transition-all"
                     style={{ backgroundColor: `${action.color}15`, color: action.color, border: `2px solid ${action.color}30` }}
@@ -263,28 +278,54 @@ export default function Attendance() {
         </Motion.div>
       )}
 
-      {/* Manager view */}
       {user?.isManager && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-5 text-center">
-            <p className="text-3xl font-bold" style={{ color: "#00b5b5" }}>
-              {records.filter(r => r.date === todayStr && r.status === "present").length}
-            </p>
-            <p className="text-sm text-slate-500 mt-1">Prezenți Azi</p>
+        <>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white rounded-2xl border border-slate-200/60 p-5 text-center">
+              <p className="text-3xl font-bold" style={{ color: "#00b5b5" }}>
+                {records.filter(r => r.date === todayStr && r.status === "present").length}
+              </p>
+              <p className="text-sm text-slate-500 mt-1">Prezenți Azi</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200/60 p-5 text-center">
+              <p className="text-3xl font-bold text-red-400">
+                {records.filter(r => r.date === todayStr && r.status === "absent").length}
+              </p>
+              <p className="text-sm text-slate-500 mt-1">Absenți Azi</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200/60 p-5 text-center">
+              <p className="text-3xl font-bold text-amber-400">
+                {employees.filter(e => e.current_status === "sedinta").length}
+              </p>
+              <p className="text-sm text-slate-500 mt-1">În Ședință</p>
+            </div>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-5 text-center">
-            <p className="text-3xl font-bold text-red-400">
-              {records.filter(r => r.date === todayStr && r.status === "absent").length}
-            </p>
-            <p className="text-sm text-slate-500 mt-1">Absenți Azi</p>
+
+          {/* Export PDF */}
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-5 flex flex-col sm:flex-row items-center gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#f0fafa" }}>
+                <Download className="h-5 w-5" style={{ color: "#00b5b5" }} />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900 text-sm">Export Raport Prezență</p>
+                <p className="text-xs text-slate-400">Descarcă raportul lunar în format PDF</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <input type="month" value={exportMonth} onChange={e => setExportMonth(e.target.value)}
+                className="h-9 rounded-md border border-input bg-white px-3 text-sm" />
+              <button onClick={exportPDF}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors"
+                style={{ backgroundColor: "#00b5b5" }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = "#009999"}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = "#00b5b5"}>
+                <Download className="h-4 w-4" />
+                Descarcă PDF
+              </button>
+            </div>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-5 text-center">
-            <p className="text-3xl font-bold text-amber-400">
-              {employees.filter(e => e.current_status === "sedinta").length}
-            </p>
-            <p className="text-sm text-slate-500 mt-1">În Ședință</p>
-          </div>
-        </div>
+        </>
       )}
 
       {isLoading ? (
