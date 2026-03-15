@@ -1,12 +1,16 @@
-import React from "react";
+import React, { useState } from "react";
 import { appClient } from "@/api/appClient";
 import { useQuery } from "@tanstack/react-query";
 import { Users, BarChart3, Clock, CalendarCheck, CheckSquare, MessageSquare, TrendingUp } from "lucide-react";
 import StatCard from "../components/dashboard/StatCard";
 import ProductivityChart from "../components/dashboard/ProductivityChart";
 import TeamOverview from "../components/dashboard/TeamOverview";
+import { seedDatabase } from "@/lib/seedData";
 
 export default function Dashboard() {
+  const [seeding, setSeeding] = useState(false);
+  const [seeded, setSeeded] = useState(false);
+
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
     queryFn: () => appClient.entities.Employee.list(),
@@ -43,7 +47,6 @@ export default function Dashboard() {
   const tasksTotal = tasks.length;
   const messagesTotal = messages.length;
 
-  // Prezenta pe departamente
   const deptStats = employees.reduce((acc, emp) => {
     if (!acc[emp.department]) acc[emp.department] = { total: 0, active: 0 };
     acc[emp.department].total++;
@@ -51,12 +54,10 @@ export default function Dashboard() {
     return acc;
   }, {});
 
-  // Top angajati dupa productivitate
   const topEmployees = [...employees]
     .sort((a, b) => (b.productivity_score || 0) - (a.productivity_score || 0))
     .slice(0, 5);
 
-  // Prezenta ultima saptamana
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - i);
@@ -71,7 +72,24 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Stat Cards */}
+
+      {/* Buton Date Demo */}
+      {!seeded && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-amber-800 text-sm">Date Demo</p>
+            <p className="text-xs text-amber-600">Populează baza de date cu date de demonstrație</p>
+          </div>
+          <button
+            onClick={async () => { setSeeding(true); await seedDatabase(); setSeeding(false); setSeeded(true); }}
+            disabled={seeding}
+            className="px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors"
+            style={{ backgroundColor: "#f59e0b" }}>
+            {seeding ? "Se încarcă..." : "Populează Date Demo"}
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard title="Angajați Activi" value={activeCount} subtitle={`${employees.length} total`} icon={Users} color="blue" delay={0} />
         <StatCard title="Productivitate Medie" value={`${avgProductivity}%`} subtitle="Media echipei" icon={BarChart3} color="green" delay={0.1} />
@@ -79,7 +97,6 @@ export default function Dashboard() {
         <StatCard title="Prezenți Azi" value={presentToday} subtitle={`din ${activeCount} activi`} icon={CalendarCheck} color="orange" delay={0.3} />
       </div>
 
-      {/* Rand 2 - Sarcini si Mesaje */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl border border-slate-200/60 p-5">
           <div className="flex items-center gap-3 mb-3">
@@ -124,7 +141,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Grafice */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3">
           <ProductivityChart logs={logs} />
@@ -134,7 +150,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Prezenta ultima saptamana */}
       <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
         <h3 className="font-semibold text-slate-900 mb-4">Prezență Ultima Săptămână</h3>
         <div className="flex items-end gap-2 h-32">
@@ -160,7 +175,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Top Angajati */}
       {topEmployees.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
           <h3 className="font-semibold text-slate-900 mb-4">Top Angajați după Productivitate</h3>
@@ -187,7 +201,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Departamente */}
       {Object.keys(deptStats).length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
           <h3 className="font-semibold text-slate-900 mb-4">Angajați pe Departamente</h3>
