@@ -163,17 +163,14 @@ export default function Attendance() {
   const exportPDF = () => {
     const doc = new jsPDF();
     const monthRecords = records.filter(r => r.date?.startsWith(exportMonth));
-
     doc.setFontSize(18);
     doc.setTextColor(0, 181, 181);
     doc.text("Alex Tours - Raport Prezenta", 14, 20);
-
     doc.setFontSize(11);
     doc.setTextColor(100);
     doc.text(`Luna: ${exportMonth}`, 14, 30);
     doc.text(`Generat: ${format(new Date(), "dd.MM.yyyy HH:mm")}`, 14, 37);
     doc.text(`Total inregistrari: ${monthRecords.length}`, 14, 44);
-
     autoTable(doc, {
       startY: 52,
       head: [["Angajat", "Data", "Check-in", "Status", "Locatie"]],
@@ -188,7 +185,6 @@ export default function Attendance() {
       alternateRowStyles: { fillColor: [240, 250, 250] },
       styles: { fontSize: 10 },
     });
-
     doc.save(`prezenta-${exportMonth}.pdf`);
   };
 
@@ -301,29 +297,213 @@ export default function Attendance() {
             </div>
           </div>
 
-          {/* Export PDF */}
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+              <h3 className="font-semibold text-slate-900">Raport Pontaj per Angajat</h3>
+              <input type="month" value={exportMonth} onChange={e => setExportMonth(e.target.value)}
+                className="h-9 rounded-md border border-input bg-white px-3 text-sm" />
+            </div>
+
+            <div className="space-y-3">
+              {employees.filter(e => e.status === "active").map(emp => {
+                const empEvents = events.filter(ev =>
+                  ev.employee_email === emp.email &&
+                  ev.date?.startsWith(exportMonth)
+                );
+                const empRecords = records.filter(r =>
+                  r.employee_email === emp.email &&
+                  r.date?.startsWith(exportMonth)
+                );
+
+                const zilePrezente = empRecords.filter(r => r.status === "present").length;
+                const zileAbsente = empRecords.filter(r => r.status === "absent").length;
+
+                let totalMinute = 0;
+                const zileLucrate = [...new Set(empEvents.map(e => e.date))];
+                zileLucrate.forEach(date => {
+                  const dayEvents = empEvents.filter(e => e.date === date)
+                    .sort((a, b) => a.time?.localeCompare(b.time));
+                  let checkIn = null;
+                  let breakStart = null;
+                  let breakTime = 0;
+                  dayEvents.forEach(ev => {
+                    const time = ev.time ? ev.time.split(":").map(Number) : null;
+                    if (!time) return;
+                    const minutes = time[0] * 60 + time[1];
+                    if (ev.event_type === "check_in") checkIn = minutes;
+                    if (ev.event_type === "break_start") breakStart = minutes;
+                    if (ev.event_type === "break_end" && breakStart) {
+                      breakTime += minutes - breakStart;
+                      breakStart = null;
+                    }
+                    if (ev.event_type === "check_out" && checkIn) {
+                      totalMinute += minutes - checkIn - breakTime;
+                    }
+                  });
+                });
+
+                const oreTotal = Math.floor(totalMinute / 60);
+                const minuteRamase = totalMinute % 60;
+                const oreLucrate = totalMinute > 0 ? `${oreTotal}h ${minuteRamase > 0 ? minuteRamase + "min" : ""}`.trim() : "—";
+
+                const exportAngajatPDF = () => {
+              
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Header
+  doc.setFillColor(26, 58, 58);
+  doc.rect(0, 0, pageWidth, 40, "F");
+  doc.setFontSize(20);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.text("ALEX TOURS", 14, 18);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(0, 181, 181);
+  doc.text("Raport Pontaj Lunar", 14, 28);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`Generat: ${format(new Date(), "dd.MM.yyyy HH:mm")}`, pageWidth - 14, 28, { align: "right" });
+
+  // Info angajat
+  doc.setFillColor(240, 250, 250);
+  doc.rect(0, 40, pageWidth, 35, "F");
+  doc.setFontSize(14);
+  doc.setTextColor(26, 58, 58);
+  doc.setFont("helvetica", "bold");
+  doc.text(emp.full_name, 14, 55);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Departament: ${emp.department || "—"}`, 14, 65);
+  doc.text(`Perioada: ${exportMonth}`, pageWidth / 2, 65, { align: "center" });
+  doc.text(`Email: ${emp.email}`, pageWidth - 14, 65, { align: "right" });
+
+  // Sumar
+  doc.setFillColor(0, 181, 181);
+  doc.rect(14, 85, (pageWidth - 28) / 3 - 5, 30, "F");
+  doc.setFillColor(239, 68, 68);
+  doc.rect(14 + (pageWidth - 28) / 3, 85, (pageWidth - 28) / 3 - 5, 30, "F");
+  doc.setFillColor(26, 58, 58);
+  doc.rect(14 + ((pageWidth - 28) / 3) * 2, 85, (pageWidth - 28) / 3 - 5, 30, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text(`${zilePrezente}`, 14 + (pageWidth - 28) / 6 - 5, 97, { align: "center" });
+  doc.text(`${zileAbsente}`, 14 + (pageWidth - 28) / 2, 97, { align: "center" });
+  doc.text(oreLucrate, 14 + ((pageWidth - 28) / 6) * 5 + 5, 97, { align: "center" });
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text("Zile Prezente", 14 + (pageWidth - 28) / 6 - 5, 108, { align: "center" });
+  doc.text("Zile Absente", 14 + (pageWidth - 28) / 2, 108, { align: "center" });
+  doc.text("Total Ore Lucrate", 14 + ((pageWidth - 28) / 6) * 5 + 5, 108, { align: "center" });
+
+  // Tabel
+  autoTable(doc, {
+    startY: 125,
+    head: [["Data", "Check-in", "Pauză", "Check-out", "Ore Lucrate", "Locație", "Status"]],
+    body: empRecords.map(r => {
+      const dayEvs = empEvents.filter(e => e.date === r.date).sort((a, b) => a.time?.localeCompare(b.time));
+      const breakStart = dayEvs.find(e => e.event_type === "break_start")?.time || "—";
+      const breakEnd = dayEvs.find(e => e.event_type === "break_end")?.time || "—";
+      const checkOut = dayEvs.find(e => e.event_type === "check_out")?.time || "—";
+      const pausaStr = breakStart !== "—" && breakEnd !== "—" ? `${breakStart} - ${breakEnd}` : "—";
+      const dayHours = calculateHours(dayEvs) || "—";
+      return [
+        r.date || "—",
+        r.check_in || "—",
+        pausaStr,
+        checkOut,
+        dayHours,
+        r.work_location || "—",
+        r.status === "present" ? "Prezent" : "Absent",
+      ];
+    }),
+    headStyles: { fillColor: [26, 58, 58], textColor: 255, fontStyle: "bold", fontSize: 9 },
+    alternateRowStyles: { fillColor: [240, 250, 250] },
+    styles: { fontSize: 9 },
+    columnStyles: {
+      6: {
+        cellCallback: (cell) => {
+          if (cell.raw === "Prezent") cell.styles.textColor = [0, 181, 181];
+          if (cell.raw === "Absent") cell.styles.textColor = [239, 68, 68];
+        }
+      }
+    }
+  });
+
+  // Footer
+  const finalY = doc.lastAutoTable.finalY + 10;
+  doc.setDrawColor(0, 181, 181);
+  doc.setLineWidth(0.5);
+  doc.line(14, finalY, pageWidth - 14, finalY);
+  doc.setFontSize(8);
+  doc.setTextColor(150);
+  doc.text("Document generat automat de sistemul Alex Tours Virtual Office", pageWidth / 2, finalY + 8, { align: "center" });
+  doc.text("Confidențial - doar pentru uz intern", pageWidth / 2, finalY + 14, { align: "center" });
+
+  doc.save(`pontaj-${emp.full_name.replace(" ", "-")}-${exportMonth}.pdf`);
+};
+                
+
+                return (
+                  <div key={emp.id} className="flex items-center gap-4 p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors">
+                    <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                      style={{ backgroundColor: "#00b5b5" }}>
+                      {emp.full_name?.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-900 text-sm">{emp.full_name}</p>
+                      <p className="text-xs text-slate-400">{emp.department}</p>
+                    </div>
+                    <div className="flex items-center gap-6 text-center">
+                      <div>
+                        <p className="text-lg font-bold" style={{ color: "#00b5b5" }}>{zilePrezente}</p>
+                        <p className="text-xs text-slate-400">Prezent</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-red-400">{zileAbsente}</p>
+                        <p className="text-xs text-slate-400">Absent</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-slate-700">{oreLucrate}</p>
+                        <p className="text-xs text-slate-400">Ore lucrate</p>
+                      </div>
+                    </div>
+                    <button onClick={exportAngajatPDF}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-white flex-shrink-0"
+                      style={{ backgroundColor: "#00b5b5" }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = "#009999"}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = "#00b5b5"}>
+                      <Download className="h-3.5 w-3.5" />
+                      PDF
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl border border-slate-200/60 p-5 flex flex-col sm:flex-row items-center gap-4">
             <div className="flex items-center gap-3 flex-1">
               <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#f0fafa" }}>
                 <Download className="h-5 w-5" style={{ color: "#00b5b5" }} />
               </div>
               <div>
-                <p className="font-semibold text-slate-900 text-sm">Export Raport Prezență</p>
-                <p className="text-xs text-slate-400">Descarcă raportul lunar în format PDF</p>
+                <p className="font-semibold text-slate-900 text-sm">Export Raport Complet</p>
+                <p className="text-xs text-slate-400">Descarcă prezența tuturor angajaților</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <input type="month" value={exportMonth} onChange={e => setExportMonth(e.target.value)}
-                className="h-9 rounded-md border border-input bg-white px-3 text-sm" />
-              <button onClick={exportPDF}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors"
-                style={{ backgroundColor: "#00b5b5" }}
-                onMouseEnter={e => e.currentTarget.style.backgroundColor = "#009999"}
-                onMouseLeave={e => e.currentTarget.style.backgroundColor = "#00b5b5"}>
-                <Download className="h-4 w-4" />
-                Descarcă PDF
-              </button>
-            </div>
+            <button onClick={exportPDF}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors"
+              style={{ backgroundColor: "#00b5b5" }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = "#009999"}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = "#00b5b5"}>
+              <Download className="h-4 w-4" />
+              Descarcă PDF Complet
+            </button>
           </div>
         </>
       )}

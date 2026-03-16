@@ -11,17 +11,27 @@ const statusColors = {
   on_leave: "bg-violet-100 text-violet-700",
 };
 
-const locationColors = {
-  remote: "bg-blue-100 text-blue-700",
-  field: "bg-green-100 text-green-700",
-  client_site: "bg-purple-100 text-purple-700",
+const locationLabels = {
+  acasa: "Acasă",
+  teren: "În teren",
+  sedinta: "În ședință",
+  pauza: "Pauză",
+  indisponibil: "Indisponibil",
+};
+
+const statusLabels = {
+  present: "Prezent",
+  absent: "Absent",
+  late: "Întârziat",
+  half_day: "Jumătate zi",
+  on_leave: "Concediu",
 };
 
 export default function AttendanceTable({ records }) {
   if (records.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200/60 p-12 text-center text-slate-400">
-        No attendance records yet.
+        Niciun record de prezență încă.
       </div>
     );
   }
@@ -32,12 +42,11 @@ export default function AttendanceTable({ records }) {
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-50/50">
-              <TableHead className="text-xs font-semibold text-slate-500">Employee</TableHead>
-              <TableHead className="text-xs font-semibold text-slate-500">Date</TableHead>
+              <TableHead className="text-xs font-semibold text-slate-500">Angajat</TableHead>
+              <TableHead className="text-xs font-semibold text-slate-500">Data</TableHead>
               <TableHead className="text-xs font-semibold text-slate-500">Check In</TableHead>
-              <TableHead className="text-xs font-semibold text-slate-500">Check Out</TableHead>
               <TableHead className="text-xs font-semibold text-slate-500">Status</TableHead>
-              <TableHead className="text-xs font-semibold text-slate-500">Location</TableHead>
+              <TableHead className="text-xs font-semibold text-slate-500">Locație</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -45,19 +54,16 @@ export default function AttendanceTable({ records }) {
               <TableRow key={rec.id} className="hover:bg-slate-50/50 transition-colors">
                 <TableCell className="font-medium text-sm">{rec.employee_name}</TableCell>
                 <TableCell className="text-sm text-slate-600">
-                  {rec.date ? format(new Date(rec.date), "MMM d, yyyy") : "—"}
+                  {rec.date ? format(new Date(rec.date + "T00:00:00"), "d MMM yyyy") : "—"}
                 </TableCell>
                 <TableCell className="text-sm">{rec.check_in || "—"}</TableCell>
-                <TableCell className="text-sm">{rec.check_out || "—"}</TableCell>
                 <TableCell>
-                  <Badge className={`text-[10px] font-medium border-0 capitalize ${statusColors[rec.status] || ""}`}>
-                    {(rec.status || "").replace(/_/g, " ")}
+                  <Badge className={`text-[10px] font-medium border-0 ${statusColors[rec.status] || "bg-slate-100 text-slate-600"}`}>
+                    {statusLabels[rec.status] || rec.status || "—"}
                   </Badge>
                 </TableCell>
-                <TableCell>
-                  <Badge className={`text-[10px] font-medium border-0 capitalize ${locationColors[rec.work_location] || ""}`}>
-                    {(rec.work_location || "").replace(/_/g, " ")}
-                  </Badge>
+                <TableCell className="text-sm text-slate-600">
+                  {locationLabels[rec.work_location] || rec.work_location || "—"}
                 </TableCell>
               </TableRow>
             ))}
