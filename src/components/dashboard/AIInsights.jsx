@@ -123,7 +123,9 @@ Fii direct și specific, folosind numele angajaților din date.`;
 });
 
       const data = await response.json();
-      setReport(data.content?.[0]?.text || "Nu s-a putut genera raportul.");
+      console.log("API Response:", data);
+const text = data?.content?.[0]?.text || data?.error?.message || JSON.stringify(data);
+setReport(text || "Nu s-a putut genera raportul.");
     } catch (err) {
       console.error(err);
       setReport("Eroare la generarea raportului. Verificați cheia API.");
