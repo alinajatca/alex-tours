@@ -21,12 +21,12 @@ export default function Dashboard() {
 
   const { data: logs = [] } = useQuery({
     queryKey: ["productivity-logs"],
-    queryFn: () => appClient.entities.ProductivityLog.list("-date", 100),
+    queryFn: () => appClient.entities.ProductivityLog.list(100),
   });
 
   const { data: attendance = [] } = useQuery({
     queryKey: ["attendance"],
-    queryFn: () => appClient.entities.Attendance.list("-date", 50),
+    queryFn: () => appClient.entities.Attendance.list(200),
   });
 
   const { data: tasks = [] } = useQuery({
@@ -49,13 +49,6 @@ export default function Dashboard() {
   const tasksDone = tasks.filter(t => t.status === "done").length;
   const tasksTotal = tasks.length;
   const messagesTotal = messages.length;
-
-  const deptStats = employees.reduce((acc, emp) => {
-    if (!acc[emp.department]) acc[emp.department] = { total: 0, active: 0 };
-    acc[emp.department].total++;
-    if (emp.status === "active") acc[emp.department].active++;
-    return acc;
-  }, {});
 
   const topEmployees = [...employees]
     .sort((a, b) => (b.productivity_score || 0) - (a.productivity_score || 0))
@@ -93,6 +86,7 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard title="Angajați Activi" value={activeCount} subtitle={`${employees.length} total`} icon={Users} color="blue" delay={0} />
         <StatCard title="Productivitate Medie" value={`${avgProductivity}%`} subtitle="Media echipei" icon={BarChart3} color="green" delay={0.1} />
@@ -100,6 +94,17 @@ export default function Dashboard() {
         <StatCard title="Prezenți Azi" value={presentToday} subtitle={`din ${activeCount} activi`} icon={CalendarCheck} color="orange" delay={0.3} />
       </div>
 
+      {/* AI Insights - doar pentru manager */}
+      {user?.isManager && (
+        <AIInsights
+          employees={employees}
+          tasks={tasks}
+          attendance={attendance}
+          events={[]}
+        />
+      )}
+
+      {/* Sarcini si Mesaje */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl border border-slate-200/60 p-5">
           <div className="flex items-center gap-3 mb-3">
@@ -144,6 +149,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Grafice */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3">
           <ProductivityChart logs={logs} />
@@ -153,6 +159,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Prezenta ultima saptamana */}
       <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
         <h3 className="font-semibold text-slate-900 mb-4">Prezență Ultima Săptămână</h3>
         <div className="flex items-end gap-2 h-32">
@@ -178,6 +185,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Top Angajati */}
       {topEmployees.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
           <h3 className="font-semibold text-slate-900 mb-4">Top Angajați după Productivitate</h3>
@@ -203,29 +211,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-      {Object.keys(deptStats).length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
-          <h3 className="font-semibold text-slate-900 mb-4">Angajați pe Departamente</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {Object.entries(deptStats).map(([dept, stats]) => (
-              <div key={dept} className="rounded-xl p-3 text-center" style={{ backgroundColor: "#f0fafa" }}>
-                <p className="text-2xl font-bold" style={{ color: "#00b5b5" }}>{stats.active}</p>
-                <p className="text-xs text-slate-500 mt-1">{dept}</p>
-                <p className="text-xs text-slate-400">{stats.total} total</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {user?.isManager && (
-  <AIInsights
-    employees={employees}
-    tasks={tasks}
-    attendance={attendance}
-    events={[]}
-  />
-)}
     </div>
   );
 }

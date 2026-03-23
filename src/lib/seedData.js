@@ -1,163 +1,164 @@
 import { appClient } from "@/api/appClient";
 
-const employees = [
-  { full_name: "Popescu Ion", email: "popescu.ion@alextours.ro", role: "tour_guide", department: "Operations", status: "active", productivity_score: 85, current_status: "acasa" },
-  { full_name: "Ionescu Maria", email: "ionescu.maria@alextours.ro", role: "booking_agent", department: "Sales", status: "active", productivity_score: 92, current_status: "acasa" },
-  { full_name: "Constantin Ana", email: "constantin.ana@alextours.ro", role: "marketing", department: "Marketing", status: "active", productivity_score: 78, current_status: "acasa" },
-  { full_name: "Gheorghe Mihai", email: "gheorghe.mihai@alextours.ro", role: "customer_support", department: "Customer Service", status: "active", productivity_score: 88, current_status: "acasa" },
-  { full_name: "Stanescu Elena", email: "stanescu.elena@alextours.ro", role: "finance", department: "Finance", status: "active", productivity_score: 95, current_status: "acasa" },
+const EMPLOYEES = [
+  { full_name: "Popescu Ion", email: "popescu.ion@alextours.ro", role: "tour_guide", department: "Operations", status: "active", productivity_score: 85, current_status: "acasa", gender: "m" },
+  { full_name: "Ionescu Maria", email: "ionescu.maria@alextours.ro", role: "booking_agent", department: "Sales", status: "active", productivity_score: 92, current_status: "acasa", gender: "f" },
+  { full_name: "Constantin Ana", email: "constantin.ana@alextours.ro", role: "marketing", department: "Marketing", status: "active", productivity_score: 78, current_status: "acasa", gender: "f" },
+  { full_name: "Gheorghe Mihai", email: "gheorghe.mihai@alextours.ro", role: "customer_support", department: "Customer Service", status: "active", productivity_score: 88, current_status: "acasa", gender: "m" },
+  { full_name: "Stanescu Elena", email: "stanescu.elena@alextours.ro", role: "finance", department: "Finance", status: "active", productivity_score: 95, current_status: "acasa", gender: "f" },
+  { full_name: "Dumitrescu Andrei", email: "dumitrescu.andrei@alextours.ro", role: "tour_guide", department: "Operations", status: "active", productivity_score: 82, current_status: "acasa", gender: "m" },
+  { full_name: "Popa Cristina", email: "popa.cristina@alextours.ro", role: "booking_agent", department: "Sales", status: "active", productivity_score: 89, current_status: "acasa", gender: "f" },
+  { full_name: "Marin Alexandru", email: "marin.alexandru@alextours.ro", role: "operations", department: "Operations", status: "active", productivity_score: 76, current_status: "acasa", gender: "m" },
+  { full_name: "Nistor Laura", email: "nistor.laura@alextours.ro", role: "marketing", department: "Marketing", status: "active", productivity_score: 91, current_status: "acasa", gender: "f" },
+  { full_name: "Florea Bogdan", email: "florea.bogdan@alextours.ro", role: "customer_support", department: "Customer Service", status: "active", productivity_score: 84, current_status: "acasa", gender: "m" },
+  { full_name: "Rusu Ioana", email: "rusu.ioana@alextours.ro", role: "finance", department: "Finance", status: "active", productivity_score: 93, current_status: "acasa", gender: "f" },
 ];
 
-const generateAttendanceData = () => {
+const SCHEDULE = [
+  { email: "popescu.ion@alextours.ro", name: "Popescu Ion", ci: ["09:02","08:55","09:10","09:00","08:48","09:05","08:58","09:03","08:50","09:15","09:00","08:45","09:08","09:02","08:55","09:10","09:00","08:48","09:05","08:58","09:03","08:50"], bs: ["12:30","12:45","13:00","12:30","12:15","12:40","12:35","12:30","12:45","13:00","12:30","12:15","12:40","12:35","12:30","12:45","13:00","12:30","12:15","12:40","12:35","12:30"], be: ["13:00","13:15","13:30","13:00","12:45","13:10","13:05","13:00","13:15","13:30","13:00","12:45","13:10","13:05","13:00","13:15","13:30","13:00","12:45","13:10","13:05","13:00"], co: ["17:30","17:45","17:20","18:00","17:15","17:30","17:45","17:30","17:45","17:20","18:00","17:15","17:30","17:45","17:30","17:45","17:20","18:00","17:15","17:30","17:45","17:30"], loc: ["acasa","teren","acasa","sedinta","acasa","teren","acasa","acasa","teren","acasa","sedinta","acasa","teren","acasa","acasa","teren","acasa","sedinta","acasa","teren","acasa","acasa"], abs: [3,8,15] },
+  { email: "ionescu.maria@alextours.ro", name: "Ionescu Maria", ci: ["08:45","08:50","09:00","08:40","08:55","09:05","08:45","08:50","09:00","08:40","08:55","09:05","08:45","08:50","09:00","08:40","08:55","09:05","08:45","08:50","09:00","08:40"], bs: ["12:00","12:30","12:15","12:00","12:30","12:45","12:00","12:30","12:15","12:00","12:30","12:45","12:00","12:30","12:15","12:00","12:30","12:45","12:00","12:30","12:15","12:00"], be: ["12:30","13:00","12:45","12:30","13:00","13:15","12:30","13:00","12:45","12:30","13:00","13:15","12:30","13:00","12:45","12:30","13:00","13:15","12:30","13:00","12:45","12:30"], co: ["17:00","17:30","17:15","17:00","17:30","17:45","17:00","17:30","17:15","17:00","17:30","17:45","17:00","17:30","17:15","17:00","17:30","17:45","17:00","17:30","17:15","17:00"], loc: ["acasa","acasa","sedinta","acasa","acasa","teren","acasa","acasa","sedinta","acasa","acasa","teren","acasa","acasa","sedinta","acasa","acasa","teren","acasa","acasa","sedinta","acasa"], abs: [5,12] },
+  { email: "constantin.ana@alextours.ro", name: "Constantin Ana", ci: ["09:15","09:00","09:20","09:10","09:05","09:15","09:00","09:20","09:10","09:05","09:15","09:00","09:20","09:10","09:05","09:15","09:00","09:20","09:10","09:05","09:15","09:00"], bs: ["13:00","12:30","13:15","13:00","12:30","13:00","12:30","13:15","13:00","12:30","13:00","12:30","13:15","13:00","12:30","13:00","12:30","13:15","13:00","12:30","13:00","12:30"], be: ["13:30","13:00","13:45","13:30","13:00","13:30","13:00","13:45","13:30","13:00","13:30","13:00","13:45","13:30","13:00","13:30","13:00","13:45","13:30","13:00","13:30","13:00"], co: ["17:45","17:30","18:00","17:45","17:30","17:45","17:30","18:00","17:45","17:30","17:45","17:30","18:00","17:45","17:30","17:45","17:30","18:00","17:45","17:30","17:45","17:30"], loc: ["acasa","teren","acasa","teren","acasa","acasa","teren","acasa","teren","acasa","acasa","teren","acasa","teren","acasa","acasa","teren","acasa","teren","acasa","acasa","teren"], abs: [7,14,21] },
+  { email: "gheorghe.mihai@alextours.ro", name: "Gheorghe Mihai", ci: ["09:00","09:30","09:00","09:05","09:00","08:55","09:00","09:30","09:00","09:05","09:00","08:55","09:00","09:30","09:00","09:05","09:00","08:55","09:00","09:30","09:00","09:05"], bs: ["12:30","13:00","12:30","12:00","12:30","12:30","12:30","13:00","12:30","12:00","12:30","12:30","12:30","13:00","12:30","12:00","12:30","12:30","12:30","13:00","12:30","12:00"], be: ["13:00","13:30","13:00","12:30","13:00","13:00","13:00","13:30","13:00","12:30","13:00","13:00","13:00","13:30","13:00","12:30","13:00","13:00","13:00","13:30","13:00","12:30"], co: ["17:30","18:00","17:30","17:00","17:30","17:30","17:30","18:00","17:30","17:00","17:30","17:30","17:30","18:00","17:30","17:00","17:30","17:30","17:30","18:00","17:30","17:00"], loc: ["acasa","sedinta","acasa","acasa","teren","acasa","acasa","sedinta","acasa","acasa","teren","acasa","acasa","sedinta","acasa","acasa","teren","acasa","acasa","sedinta","acasa","acasa"], abs: [10,17] },
+  { email: "stanescu.elena@alextours.ro", name: "Stanescu Elena", ci: ["08:30","08:45","08:30","08:40","08:30","08:45","08:30","08:45","08:30","08:40","08:30","08:45","08:30","08:45","08:30","08:40","08:30","08:45","08:30","08:45","08:30","08:40"], bs: ["12:00","12:15","12:00","12:00","12:00","12:15","12:00","12:15","12:00","12:00","12:00","12:15","12:00","12:15","12:00","12:00","12:00","12:15","12:00","12:15","12:00","12:00"], be: ["12:30","12:45","12:30","12:30","12:30","12:45","12:30","12:45","12:30","12:30","12:30","12:45","12:30","12:45","12:30","12:30","12:30","12:45","12:30","12:45","12:30","12:30"], co: ["16:30","17:00","16:45","17:00","16:30","17:00","16:30","17:00","16:45","17:00","16:30","17:00","16:30","17:00","16:45","17:00","16:30","17:00","16:30","17:00","16:45","17:00"], loc: ["acasa","acasa","acasa","sedinta","acasa","acasa","acasa","acasa","acasa","sedinta","acasa","acasa","acasa","acasa","acasa","sedinta","acasa","acasa","acasa","acasa","acasa","sedinta"], abs: [2] },
+  { email: "dumitrescu.andrei@alextours.ro", name: "Dumitrescu Andrei", ci: ["08:55","09:05","09:00","08:50","09:10","08:45","09:00","08:55","09:05","09:00","08:50","09:10","08:45","09:00","08:55","09:05","09:00","08:50","09:10","08:45","09:00","08:55"], bs: ["12:30","13:00","12:30","12:15","12:45","12:00","12:30","12:30","13:00","12:30","12:15","12:45","12:00","12:30","12:30","13:00","12:30","12:15","12:45","12:00","12:30","12:30"], be: ["13:00","13:30","13:00","12:45","13:15","12:30","13:00","13:00","13:30","13:00","12:45","13:15","12:30","13:00","13:00","13:30","13:00","12:45","13:15","12:30","13:00","13:00"], co: ["17:30","18:00","17:30","17:15","17:45","17:00","17:30","17:30","18:00","17:30","17:15","17:45","17:00","17:30","17:30","18:00","17:30","17:15","17:45","17:00","17:30","17:30"], loc: ["teren","acasa","teren","acasa","sedinta","acasa","teren","teren","acasa","teren","acasa","sedinta","acasa","teren","teren","acasa","teren","acasa","sedinta","acasa","teren","teren"], abs: [4,11,18] },
+  { email: "popa.cristina@alextours.ro", name: "Popa Cristina", ci: ["08:50","09:00","08:45","09:10","08:55","09:00","08:50","09:00","08:45","09:10","08:55","09:00","08:50","09:00","08:45","09:10","08:55","09:00","08:50","09:00","08:45","09:10"], bs: ["12:15","12:30","12:00","12:45","12:30","12:15","12:15","12:30","12:00","12:45","12:30","12:15","12:15","12:30","12:00","12:45","12:30","12:15","12:15","12:30","12:00","12:45"], be: ["12:45","13:00","12:30","13:15","13:00","12:45","12:45","13:00","12:30","13:15","13:00","12:45","12:45","13:00","12:30","13:15","13:00","12:45","12:45","13:00","12:30","13:15"], co: ["17:15","17:30","17:00","17:45","17:30","17:15","17:15","17:30","17:00","17:45","17:30","17:15","17:15","17:30","17:00","17:45","17:30","17:15","17:15","17:30","17:00","17:45"], loc: ["acasa","acasa","acasa","teren","acasa","sedinta","acasa","acasa","acasa","teren","acasa","sedinta","acasa","acasa","acasa","teren","acasa","sedinta","acasa","acasa","acasa","teren"], abs: [6,13] },
+  { email: "marin.alexandru@alextours.ro", name: "Marin Alexandru", ci: ["09:10","09:00","08:55","09:15","09:05","08:50","09:10","09:00","08:55","09:15","09:05","08:50","09:10","09:00","08:55","09:15","09:05","08:50","09:10","09:00","08:55","09:15"], bs: ["12:45","12:30","12:15","13:00","12:30","12:00","12:45","12:30","12:15","13:00","12:30","12:00","12:45","12:30","12:15","13:00","12:30","12:00","12:45","12:30","12:15","13:00"], be: ["13:15","13:00","12:45","13:30","13:00","12:30","13:15","13:00","12:45","13:30","13:00","12:30","13:15","13:00","12:45","13:30","13:00","12:30","13:15","13:00","12:45","13:30"], co: ["17:45","17:30","17:15","18:00","17:30","17:00","17:45","17:30","17:15","18:00","17:30","17:00","17:45","17:30","17:15","18:00","17:30","17:00","17:45","17:30","17:15","18:00"], loc: ["teren","acasa","acasa","teren","sedinta","acasa","teren","acasa","acasa","teren","sedinta","acasa","teren","acasa","acasa","teren","sedinta","acasa","teren","acasa","acasa","teren"], abs: [9,16] },
+  { email: "nistor.laura@alextours.ro", name: "Nistor Laura", ci: ["08:40","08:55","09:05","08:45","09:00","08:50","08:40","08:55","09:05","08:45","09:00","08:50","08:40","08:55","09:05","08:45","09:00","08:50","08:40","08:55","09:05","08:45"], bs: ["12:10","12:25","12:35","12:15","12:30","12:20","12:10","12:25","12:35","12:15","12:30","12:20","12:10","12:25","12:35","12:15","12:30","12:20","12:10","12:25","12:35","12:15"], be: ["12:40","12:55","13:05","12:45","13:00","12:50","12:40","12:55","13:05","12:45","13:00","12:50","12:40","12:55","13:05","12:45","13:00","12:50","12:40","12:55","13:05","12:45"], co: ["17:10","17:25","17:35","17:15","17:30","17:20","17:10","17:25","17:35","17:15","17:30","17:20","17:10","17:25","17:35","17:15","17:30","17:20","17:10","17:25","17:35","17:15"], loc: ["acasa","marketing","acasa","acasa","teren","acasa","acasa","marketing","acasa","acasa","teren","acasa","acasa","marketing","acasa","acasa","teren","acasa","acasa","marketing","acasa","acasa"], abs: [1,19] },
+  { email: "florea.bogdan@alextours.ro", name: "Florea Bogdan", ci: ["09:05","08:50","09:15","09:00","08:45","09:10","09:05","08:50","09:15","09:00","08:45","09:10","09:05","08:50","09:15","09:00","08:45","09:10","09:05","08:50","09:15","09:00"], bs: ["12:35","12:20","12:45","12:30","12:15","12:40","12:35","12:20","12:45","12:30","12:15","12:40","12:35","12:20","12:45","12:30","12:15","12:40","12:35","12:20","12:45","12:30"], be: ["13:05","12:50","13:15","13:00","12:45","13:10","13:05","12:50","13:15","13:00","12:45","13:10","13:05","12:50","13:15","13:00","12:45","13:10","13:05","12:50","13:15","13:00"], co: ["17:35","17:20","17:45","17:30","17:15","17:40","17:35","17:20","17:45","17:30","17:15","17:40","17:35","17:20","17:45","17:30","17:15","17:40","17:35","17:20","17:45","17:30"], loc: ["acasa","acasa","sedinta","acasa","acasa","teren","acasa","acasa","sedinta","acasa","acasa","teren","acasa","acasa","sedinta","acasa","acasa","teren","acasa","acasa","sedinta","acasa"], abs: [20] },
+  { email: "rusu.ioana@alextours.ro", name: "Rusu Ioana", ci: ["08:35","08:50","08:40","08:55","08:30","08:45","08:35","08:50","08:40","08:55","08:30","08:45","08:35","08:50","08:40","08:55","08:30","08:45","08:35","08:50","08:40","08:55"], bs: ["12:05","12:20","12:10","12:25","12:00","12:15","12:05","12:20","12:10","12:25","12:00","12:15","12:05","12:20","12:10","12:25","12:00","12:15","12:05","12:20","12:10","12:25"], be: ["12:35","12:50","12:40","12:55","12:30","12:45","12:35","12:50","12:40","12:55","12:30","12:45","12:35","12:50","12:40","12:55","12:30","12:45","12:35","12:50","12:40","12:55"], co: ["16:35","16:50","16:40","16:55","16:30","16:45","16:35","16:50","16:40","16:55","16:30","16:45","16:35","16:50","16:40","16:55","16:30","16:45","16:35","16:50","16:40","16:55"], loc: ["acasa","acasa","sedinta","acasa","acasa","acasa","acasa","acasa","sedinta","acasa","acasa","acasa","acasa","acasa","sedinta","acasa","acasa","acasa","acasa","acasa","sedinta","acasa"], abs: [] },
+];
+
+const generateMonthData = (year, month) => {
   const records = [];
   const events = [];
+  const daysInMonth = new Date(year, month, 0).getDate();
+  let dayIdx = 0;
 
-  const schedule = [
-    { email: "popescu.ion@alextours.ro", name: "Popescu Ion", checkIns: ["09:02", "08:55", "09:10", "09:00", "08:48", "09:05", "08:58"], breakStarts: ["12:30", "12:45", "13:00", "12:30", "12:15", "12:40", "12:35"], breakEnds: ["13:00", "13:15", "13:30", "13:00", "12:45", "13:10", "13:05"], checkOuts: ["17:30", "17:45", "17:20", "18:00", "17:15", "17:30", "17:45"], locations: ["acasa", "teren", "acasa", "sedinta", "acasa", "teren", "acasa"] },
-    { email: "ionescu.maria@alextours.ro", name: "Ionescu Maria", checkIns: ["08:45", "08:50", "09:00", "08:40", "08:55", "09:05", "08:45"], breakStarts: ["12:00", "12:30", "12:15", "12:00", "12:30", "12:45", "12:00"], breakEnds: ["12:30", "13:00", "12:45", "12:30", "13:00", "13:15", "12:30"], checkOuts: ["17:00", "17:30", "17:15", "17:00", "17:30", "17:45", "17:00"], locations: ["acasa", "acasa", "sedinta", "acasa", "acasa", "teren", "acasa"] },
-    { email: "constantin.ana@alextours.ro", name: "Constantin Ana", checkIns: ["09:15", "09:00", "09:20", "09:10", null, "09:05", "09:15"], breakStarts: ["13:00", "12:30", "13:15", "13:00", null, "12:30", "13:00"], breakEnds: ["13:30", "13:00", "13:45", "13:30", null, "13:00", "13:30"], checkOuts: ["17:45", "17:30", "18:00", "17:45", null, "17:30", "17:45"], locations: ["acasa", "marketing", "acasa", "teren", null, "acasa", "acasa"] },
-    { email: "gheorghe.mihai@alextours.ro", name: "Gheorghe Mihai", checkIns: ["09:00", "09:30", "09:00", null, "09:00", "08:55", "09:00"], breakStarts: ["12:30", "13:00", "12:30", null, "12:00", "12:30", "12:30"], breakEnds: ["13:00", "13:30", "13:00", null, "12:30", "13:00", "13:00"], checkOuts: ["17:30", "18:00", "17:30", null, "17:00", "17:30", "17:30"], locations: ["acasa", "sedinta", "acasa", null, "acasa", "teren", "acasa"] },
-    { email: "stanescu.elena@alextours.ro", name: "Stanescu Elena", checkIns: ["08:30", "08:45", "08:30", "08:40", "08:30", "08:45", "08:30"], breakStarts: ["12:00", "12:15", "12:00", "12:00", "12:00", "12:15", "12:00"], breakEnds: ["12:30", "12:45", "12:30", "12:30", "12:30", "12:45", "12:30"], checkOuts: ["16:30", "17:00", "16:45", "17:00", "16:30", "17:00", "16:30"], locations: ["acasa", "acasa", "acasa", "sedinta", "acasa", "acasa", "acasa"] },
-  ];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month - 1, day);
+    const dayOfWeek = date.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-  const dates = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dayOfWeek = d.getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      dates.push(d.toISOString().split("T")[0]);
-    }
-  }
-
-  schedule.forEach(emp => {
-    dates.forEach((date, idx) => {
-      const checkIn = emp.checkIns[idx];
-      if (!checkIn) {
-        records.push({
-          employee_email: emp.email,
-          employee_name: emp.name,
-          date,
-          check_in: null,
-          status: "absent",
-          work_location: emp.locations[idx] || "acasa",
-        });
+    SCHEDULE.forEach(emp => {
+      const isAbsent = emp.abs.includes(day);
+      if (isAbsent) {
+        records.push({ employee_email: emp.email, employee_name: emp.name, date: dateStr, check_in: null, status: "absent", work_location: "acasa" });
         return;
       }
-
-      records.push({
-        employee_email: emp.email,
-        employee_name: emp.name,
-        date,
-        check_in: checkIn,
-        status: "present",
-        work_location: emp.locations[idx] || "acasa",
-      });
-
-      events.push({ employee_email: emp.email, employee_name: emp.name, date, time: checkIn, event_type: "check_in" });
-      if (emp.breakStarts[idx]) events.push({ employee_email: emp.email, employee_name: emp.name, date, time: emp.breakStarts[idx], event_type: "break_start" });
-      if (emp.breakEnds[idx]) events.push({ employee_email: emp.email, employee_name: emp.name, date, time: emp.breakEnds[idx], event_type: "break_end" });
-      if (emp.checkOuts[idx]) events.push({ employee_email: emp.email, employee_name: emp.name, date, time: emp.checkOuts[idx], event_type: "check_out" });
+      const idx = dayIdx % emp.ci.length;
+      records.push({ employee_email: emp.email, employee_name: emp.name, date: dateStr, check_in: emp.ci[idx], status: "present", work_location: emp.loc[idx] });
+      events.push({ employee_email: emp.email, employee_name: emp.name, date: dateStr, time: emp.ci[idx], event_type: "check_in" });
+      events.push({ employee_email: emp.email, employee_name: emp.name, date: dateStr, time: emp.bs[idx], event_type: "break_start" });
+      events.push({ employee_email: emp.email, employee_name: emp.name, date: dateStr, time: emp.be[idx], event_type: "break_end" });
+      events.push({ employee_email: emp.email, employee_name: emp.name, date: dateStr, time: emp.co[idx], event_type: "check_out" });
     });
-  });
-
+    dayIdx++;
+  }
   return { records, events };
 };
 
-const tasks = [
-  { title: "Pregătire ofertă Grecia 2026", description: "Creare pachet turistic pentru sezonul estival", priority: "high", status: "in_progress", assigned_to_name: "Ionescu Maria", assigned_to_email: "ionescu.maria@alextours.ro", due_date: "2026-04-01", created_by_name: "Alina" },
-  { title: "Actualizare site web", description: "Adăugare destinații noi pentru vara 2026", priority: "medium", status: "todo", assigned_to_name: "Constantin Ana", assigned_to_email: "constantin.ana@alextours.ro", due_date: "2026-03-20", created_by_name: "Alina" },
-  { title: "Raport lunar vânzări", description: "Compilare date vânzări februarie 2026", priority: "high", status: "done", assigned_to_name: "Stanescu Elena", assigned_to_email: "stanescu.elena@alextours.ro", due_date: "2026-03-05", created_by_name: "Alina" },
-  { title: "Contactare furnizori hoteluri", description: "Negociere contracte pentru sezon", priority: "medium", status: "in_progress", assigned_to_name: "Popescu Ion", assigned_to_email: "popescu.ion@alextours.ro", due_date: "2026-03-25", created_by_name: "Alina" },
-  { title: "Campanie social media Paște", description: "Creare conținut pentru sărbători", priority: "low", status: "todo", assigned_to_name: "Constantin Ana", assigned_to_email: "constantin.ana@alextours.ro", due_date: "2026-03-30", created_by_name: "Alina" },
-  { title: "Training angajați noi", description: "Sesiune de onboarding pentru noii colegi", priority: "medium", status: "todo", assigned_to_name: "Gheorghe Mihai", assigned_to_email: "gheorghe.mihai@alextours.ro", due_date: "2026-03-22", created_by_name: "Alina" },
-  { title: "Verificare recenzii TripAdvisor", description: "Răspuns la recenzii clienți", priority: "low", status: "done", assigned_to_name: "Gheorghe Mihai", assigned_to_email: "gheorghe.mihai@alextours.ro", due_date: "2026-03-10", created_by_name: "Alina" },
-  { title: "Buget marketing trimestrul 2", description: "Alocare buget campanii online", priority: "high", status: "in_progress", assigned_to_name: "Stanescu Elena", assigned_to_email: "stanescu.elena@alextours.ro", due_date: "2026-03-28", created_by_name: "Alina" },
-];
+const generateMessages = (year, month) => {
+  const monthStr = `${year}-${String(month).padStart(2, "0")}`;
+  return [
+    { channel: "general", channel_type: "channel", sender_name: "Ionescu Maria", sender_email: "ionescu.maria@alextours.ro", content: "Bună dimineața echipei! 👋" },
+    { channel: "general", channel_type: "channel", sender_name: "Popescu Ion", sender_email: "popescu.ion@alextours.ro", content: "Am finalizat pachetele pentru sezonul următor!" },
+    { channel: "tours", channel_type: "channel", sender_name: "Dumitrescu Andrei", sender_email: "dumitrescu.andrei@alextours.ro", content: "Avem 5 rezervări noi luna aceasta!" },
+    { channel: "bookings", channel_type: "channel", sender_name: "Popa Cristina", sender_email: "popa.cristina@alextours.ro", content: "Client nou - pachet all-inclusive confirmat!" },
+    { channel: "marketing", channel_type: "channel", sender_name: "Nistor Laura", sender_email: "nistor.laura@alextours.ro", content: `Campania lunii ${monthStr} a generat 200 lead-uri noi!` },
+    { channel: "general", channel_type: "channel", sender_name: "Rusu Ioana", sender_email: "rusu.ioana@alextours.ro", content: "Raportul financiar e gata!" },
+    { channel: "random", channel_type: "channel", sender_name: "Florea Bogdan", sender_email: "florea.bogdan@alextours.ro", content: "Cineva vrea cafea? ☕" },
+    { channel: "general", channel_type: "channel", sender_name: "Marin Alexandru", sender_email: "marin.alexandru@alextours.ro", content: "Operațiunile pentru luna viitoare sunt planificate!" },
+  ];
+};
 
-const messages = [
-  { channel: "general", channel_type: "channel", sender_name: "Ionescu Maria", sender_email: "ionescu.maria@alextours.ro", content: "Bună dimineața tuturor! 👋" },
-  { channel: "general", channel_type: "channel", sender_name: "Popescu Ion", sender_email: "popescu.ion@alextours.ro", content: "Bună! Astăzi am întâlnire cu furnizorul de la Rhodos." },
-  { channel: "general", channel_type: "channel", sender_name: "Constantin Ana", sender_email: "constantin.ana@alextours.ro", content: "Am postat noile oferte de Paște pe Instagram! Verificați!" },
-  { channel: "general", channel_type: "channel", sender_name: "Gheorghe Mihai", sender_email: "gheorghe.mihai@alextours.ro", content: "Cineva a lăsat o recenzie foarte frumoasă pe TripAdvisor azi! 🌟" },
-  { channel: "tours", channel_type: "channel", sender_name: "Popescu Ion", sender_email: "popescu.ion@alextours.ro", content: "Pachetul Grecia 7 nopți este gata de publicare." },
-  { channel: "tours", channel_type: "channel", sender_name: "Ionescu Maria", sender_email: "ionescu.maria@alextours.ro", content: "Prețul pentru Santorini trebuie actualizat, am primit oferta nouă." },
-  { channel: "tours", channel_type: "channel", sender_name: "Popescu Ion", sender_email: "popescu.ion@alextours.ro", content: "Am adăugat și varianta all-inclusive pentru Creta. Arată bine!" },
-  { channel: "bookings", channel_type: "channel", sender_name: "Gheorghe Mihai", sender_email: "gheorghe.mihai@alextours.ro", content: "Avem 3 rezervări noi pentru Turcia în această săptămână!" },
-  { channel: "bookings", channel_type: "channel", sender_name: "Ionescu Maria", sender_email: "ionescu.maria@alextours.ro", content: "Clientul Dumitru Vasile a confirmat rezervarea pentru august." },
-  { channel: "marketing", channel_type: "channel", sender_name: "Constantin Ana", sender_email: "constantin.ana@alextours.ro", content: "Campania de Paște a generat 150 de lead-uri noi. Excelent!" },
-  { channel: "marketing", channel_type: "channel", sender_name: "Constantin Ana", sender_email: "constantin.ana@alextours.ro", content: "Propun să facem și o campanie pentru city break-uri de toamnă." },
-  { channel: "random", channel_type: "channel", sender_name: "Stanescu Elena", sender_email: "stanescu.elena@alextours.ro", content: "Cine vrea să comandăm pizza vineri? 🍕" },
-  { channel: "random", channel_type: "channel", sender_name: "Gheorghe Mihai", sender_email: "gheorghe.mihai@alextours.ro", content: "Eu sunt în! 🙋" },
-];
+const generateTasks = (year, month) => {
+  const monthStr = `${year}-${String(month).padStart(2, "0")}`;
+  const destinations = ["Grecia", "Turcia", "Italia", "Spania", "Egipt", "Dubai"];
+  const dest = destinations[month % destinations.length];
+  const isDone = month < new Date().getMonth() + 1;
+  return [
+    { title: `Ofertă ${dest} ${year}`, description: `Pachet turistic ${dest}`, priority: "high", status: isDone ? "done" : "in_progress", assigned_to_name: "Ionescu Maria", assigned_to_email: "ionescu.maria@alextours.ro", due_date: `${monthStr}-10`, created_by_name: "Alina" },
+    { title: `Campanie social media ${dest}`, description: `Postări pentru ${dest}`, priority: "medium", status: isDone ? "done" : "in_progress", assigned_to_name: "Nistor Laura", assigned_to_email: "nistor.laura@alextours.ro", due_date: `${monthStr}-15`, created_by_name: "Alina" },
+    { title: `Raport lunar ${monthStr}`, description: "Compilare date", priority: "high", status: isDone ? "done" : "todo", assigned_to_name: "Rusu Ioana", assigned_to_email: "rusu.ioana@alextours.ro", due_date: `${monthStr}-25`, created_by_name: "Alina" },
+    { title: `Negociere furnizori ${dest}`, description: "Contracte și prețuri", priority: "medium", status: isDone ? "done" : "todo", assigned_to_name: "Popescu Ion", assigned_to_email: "popescu.ion@alextours.ro", due_date: `${monthStr}-20`, created_by_name: "Alina" },
+    { title: "Training echipă", description: "Sesiune onboarding", priority: "low", status: isDone ? "done" : "todo", assigned_to_name: "Florea Bogdan", assigned_to_email: "florea.bogdan@alextours.ro", due_date: `${monthStr}-28`, created_by_name: "Alina" },
+    { title: `Rezervări ${dest} confirmate`, description: "Confirmare rezervări clienți", priority: "high", status: isDone ? "done" : "in_progress", assigned_to_name: "Popa Cristina", assigned_to_email: "popa.cristina@alextours.ro", due_date: `${monthStr}-12`, created_by_name: "Alina" },
+    { title: "Actualizare site web", description: "Destinații noi pe site", priority: "medium", status: isDone ? "done" : "todo", assigned_to_name: "Constantin Ana", assigned_to_email: "constantin.ana@alextours.ro", due_date: `${monthStr}-18`, created_by_name: "Alina" },
+  ];
+};
 
-const clients = [
-  { full_name: "Dumitru Vasile", email: "dumitru.vasile@gmail.com", phone: "0721345678", city: "București", status: "activ", last_tour: "Turcia 2025", tours_count: "3", notes: "Preferă hoteluri 5 stele" },
-  { full_name: "Popa Andreea", email: "popa.andreea@gmail.com", phone: "0734567890", city: "Cluj-Napoca", status: "activ", last_tour: "Grecia 2025", tours_count: "5", notes: "Client fidel, reducere 10%" },
+const CLIENTS = [
+  { full_name: "Dumitru Vasile", email: "dumitru.vasile@gmail.com", phone: "0721345678", city: "București", status: "activ", last_tour: "Turcia 2025", tours_count: "5", notes: "Preferă hoteluri 5 stele" },
+  { full_name: "Popa Andreea", email: "popa.andreea@gmail.com", phone: "0734567890", city: "Cluj-Napoca", status: "activ", last_tour: "Grecia 2025", tours_count: "7", notes: "Client fidel, reducere 10%" },
   { full_name: "Marin Cristian", email: "marin.cristian@yahoo.com", phone: "0756789012", city: "Timișoara", status: "prospect", last_tour: "", tours_count: "0", notes: "Interesat de Maldive" },
-  { full_name: "Nicolescu Ioana", email: "nicolescu.ioana@gmail.com", phone: "0712345678", city: "Iași", status: "activ", last_tour: "Egipt 2025", tours_count: "2", notes: "" },
+  { full_name: "Nicolescu Ioana", email: "nicolescu.ioana@gmail.com", phone: "0712345678", city: "Iași", status: "activ", last_tour: "Egipt 2025", tours_count: "3", notes: "" },
   { full_name: "Florea Alexandru", email: "florea.alex@gmail.com", phone: "0745678901", city: "Constanța", status: "inactiv", last_tour: "Bulgaria 2024", tours_count: "1", notes: "Nu a mai răspuns la oferte" },
   { full_name: "Stan Mihaela", email: "stan.mihaela@gmail.com", phone: "0723456789", city: "Brașov", status: "activ", last_tour: "Italia 2025", tours_count: "4", notes: "Preferă city break-uri" },
   { full_name: "Radu George", email: "radu.george@yahoo.com", phone: "0767890123", city: "București", status: "prospect", last_tour: "", tours_count: "0", notes: "Interesat de pachete familie" },
+  { full_name: "Ionescu Roxana", email: "ionescu.roxana@gmail.com", phone: "0731234567", city: "Sibiu", status: "activ", last_tour: "Spania 2025", tours_count: "6", notes: "Preferă vacanțe culturale" },
+  { full_name: "Gheorghiu Dan", email: "gheorghiu.dan@yahoo.com", phone: "0742345678", city: "Galați", status: "activ", last_tour: "Dubai 2025", tours_count: "2", notes: "" },
+  { full_name: "Marinescu Ana", email: "marinescu.ana@gmail.com", phone: "0753456789", city: "Ploiești", status: "prospect", last_tour: "", tours_count: "0", notes: "Interesat de croaziere" },
+  { full_name: "Constantin Victor", email: "constantin.victor@gmail.com", phone: "0764567890", city: "Craiova", status: "activ", last_tour: "Grecia 2026", tours_count: "4", notes: "Rezervă mereu cu familia" },
+  { full_name: "Dumitrescu Alina", email: "dumitrescu.alina@gmail.com", phone: "0775678901", city: "Oradea", status: "inactiv", last_tour: "Turcia 2024", tours_count: "2", notes: "" },
+  { full_name: "Popescu Catalin", email: "popescu.catalin@yahoo.com", phone: "0786789012", city: "Arad", status: "activ", last_tour: "Italia 2026", tours_count: "3", notes: "Preferă hoteluri boutique" },
+  { full_name: "Niculae Maria", email: "niculae.maria@gmail.com", phone: "0797890123", city: "Pitești", status: "prospect", last_tour: "", tours_count: "0", notes: "Interesat de Japonia" },
+  { full_name: "Barbu Sorin", email: "barbu.sorin@gmail.com", phone: "0708901234", city: "Bacău", status: "activ", last_tour: "Egipt 2026", tours_count: "5", notes: "Client VIP" },
 ];
 
-const calendarEvents = [
-  { title: "Ședință săptămânală echipă", date: "2026-03-16", time: "10:00", duration: "60", description: "Revizuire obiective săptămână", color: "teal", created_by_name: "Alina" },
-  { title: "Prezentare oferte vara 2026", date: "2026-03-18", time: "14:00", duration: "90", description: "Prezentare pachete noi pentru clienți", color: "purple", created_by_name: "Alina" },
-  { title: "Training sistem rezervări", date: "2026-03-20", time: "11:00", duration: "120", description: "Sesiune training pentru angajați noi", color: "amber", created_by_name: "Alina" },
-  { title: "Întâlnire furnizori hoteluri", date: "2026-03-25", time: "09:00", duration: "60", description: "Negociere contracte sezon estival", color: "green", created_by_name: "Alina" },
-  { title: "Deadline raport lunar", date: "2026-03-31", time: "17:00", duration: "30", description: "Termen limită raport financiar martie", color: "red", created_by_name: "Alina" },
+const CALENDAR_EVENTS = [
+  { title: "Ședință săptămânală echipă", date: "2026-04-06", time: "10:00", duration: "60", description: "Revizuire obiective", color: "teal", created_by_name: "Alina" },
+  { title: "Prezentare oferte vara 2026", date: "2026-04-15", time: "14:00", duration: "90", description: "Pachete noi pentru clienți", color: "purple", created_by_name: "Alina" },
+  { title: "Training sistem rezervări", date: "2026-04-22", time: "11:00", duration: "120", description: "Training angajați noi", color: "amber", created_by_name: "Alina" },
+  { title: "Întâlnire furnizori", date: "2026-05-05", time: "09:00", duration: "60", description: "Negociere contracte", color: "green", created_by_name: "Alina" },
+  { title: "Ședință lunară", date: "2026-05-12", time: "10:00", duration: "60", description: "Raport mai", color: "teal", created_by_name: "Alina" },
+  { title: "Workshop marketing digital", date: "2026-05-20", time: "13:00", duration: "180", description: "Social media și SEO", color: "purple", created_by_name: "Alina" },
+  { title: "Ședință trimestrială", date: "2026-06-03", time: "10:00", duration: "120", description: "Raport trimestrul 2", color: "teal", created_by_name: "Alina" },
+  { title: "Lansare oferte toamnă", date: "2026-06-15", time: "14:00", duration: "90", description: "Prezentare destinații toamnă", color: "amber", created_by_name: "Alina" },
+  { title: "Team building online", date: "2026-06-26", time: "16:00", duration: "120", description: "Activitate echipă", color: "green", created_by_name: "Alina" },
+  { title: "Ședință lunară iulie", date: "2026-07-07", time: "10:00", duration: "60", description: "Raport iulie", color: "teal", created_by_name: "Alina" },
+  { title: "Evaluare performanță", date: "2026-07-20", time: "09:00", duration: "180", description: "Evaluare semestrială angajați", color: "red", created_by_name: "Alina" },
+  { title: "Planificare sezon toamnă", date: "2026-08-04", time: "10:00", duration: "90", description: "Strategie septembrie-noiembrie", color: "purple", created_by_name: "Alina" },
+  { title: "Ședință finală august", date: "2026-08-18", time: "10:00", duration: "60", description: "Raport august", color: "teal", created_by_name: "Alina" },
 ];
 
-const rooms = [
+const ROOMS = [
   { name: "Sala Principală", description: "Sala pentru ședințe de echipă", meeting_url: "https://meet.google.com/abc-defg-hij", topic: "Ședință săptămânală", status: "available", current_participants: 0, scheduled_by_name: "Alina" },
   { name: "Sala Vânzări", description: "Prezentări și negocieri cu clienți", meeting_url: "https://meet.google.com/klm-nopq-rst", topic: "Prezentare oferte", status: "available", current_participants: 0, scheduled_by_name: "Alina" },
   { name: "Sala Training", description: "Sesiuni de training și onboarding", meeting_url: "https://meet.google.com/uvw-xyz-123", topic: "Training angajați", status: "available", current_participants: 0, scheduled_by_name: "Alina" },
+  { name: "Sala Marketing", description: "Brainstorming și campanii", meeting_url: "https://meet.google.com/mkt-room-456", topic: "Strategie marketing", status: "available", current_participants: 0, scheduled_by_name: "Alina" },
 ];
 
 export const seedDatabase = async () => {
   console.log("🌱 Începe popularea bazei de date...");
   try {
     console.log("👥 Adăugare angajați...");
-    for (const emp of employees) {
+    for (const emp of EMPLOYEES) {
       await appClient.entities.Employee.create(emp);
     }
 
-    console.log("✅ Adăugare sarcini...");
-    for (const task of tasks) {
-      await appClient.entities.Task.create(task);
-    }
-
-    console.log("📅 Adăugare prezență și evenimente...");
-    const { records, events } = generateAttendanceData();
-    for (const rec of records) {
-      await appClient.entities.Attendance.create(rec);
-    }
-    for (const ev of events) {
-      await appClient.entities.AttendanceEvent.create(ev);
-    }
-
-    console.log("💬 Adăugare mesaje...");
-    for (const msg of messages) {
-      await appClient.entities.Message.create(msg);
+    console.log("📅 Adăugare date martie-august 2026...");
+    for (let month = 3; month <= 8; month++) {
+      console.log(`  Luna ${month}...`);
+      const { records, events } = generateMonthData(2026, month);
+      for (const rec of records) await appClient.entities.Attendance.create(rec);
+      for (const ev of events) await appClient.entities.AttendanceEvent.create(ev);
+      const msgs = generateMessages(2026, month);
+      for (const msg of msgs) await appClient.entities.Message.create(msg);
+      const tasksList = generateTasks(2026, month);
+      for (const task of tasksList) await appClient.entities.Task.create(task);
     }
 
     console.log("👤 Adăugare clienți...");
-    for (const client of clients) {
-      await appClient.entities.Client.create(client);
-    }
+    for (const client of CLIENTS) await appClient.entities.Client.create(client);
 
-    console.log("📆 Adăugare evenimente calendar...");
-    for (const event of calendarEvents) {
-      await appClient.entities.CalendarEvent.create(event);
-    }
+    console.log("📆 Adăugare calendar...");
+    for (const event of CALENDAR_EVENTS) await appClient.entities.CalendarEvent.create(event);
 
     console.log("🏠 Adăugare săli...");
-    for (const room of rooms) {
-      await appClient.entities.Room.create(room);
-    }
+    for (const room of ROOMS) await appClient.entities.Room.create(room);
 
-    console.log("✅ Baza de date populată cu succes!");
+    console.log("✅ Gata!");
     return true;
   } catch (err) {
     console.error("❌ Eroare:", err);
