@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 
 const createEntity = (collectionName) => ({
-  list: async (_orderField = "created_date", maxItems = 100) => {
+  list: async (maxItems = 100) => {
     const q = query(collection(db, collectionName), limit(maxItems));
     const snapshot = await getDocs(q);
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));

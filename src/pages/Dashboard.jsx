@@ -6,10 +6,13 @@ import StatCard from "../components/dashboard/StatCard";
 import ProductivityChart from "../components/dashboard/ProductivityChart";
 import TeamOverview from "../components/dashboard/TeamOverview";
 import { seedDatabase } from "@/lib/seedData";
+import AIInsights from "../components/dashboard/AIInsights";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function Dashboard() {
   const [seeding, setSeeding] = useState(false);
   const [seeded, setSeeded] = useState(false);
+  const { user } = useAuth();
 
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
@@ -215,6 +218,14 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+      {user?.isManager && (
+  <AIInsights
+    employees={employees}
+    tasks={tasks}
+    attendance={attendance}
+    events={[]}
+  />
+)}
     </div>
   );
 }
