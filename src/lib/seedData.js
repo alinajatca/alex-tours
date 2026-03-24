@@ -165,3 +165,63 @@ export const seedDatabase = async () => {
     return false;
   }
 };
+export const seedMissing = async () => {
+  console.log("🌱 Adăugare date lipsă...");
+  try {
+    const clients = [
+      { full_name: "Dumitru Vasile", email: "dumitru.vasile@gmail.com", phone: "0721345678", city: "București", status: "activ", last_tour: "Turcia 2025", tours_count: "5", notes: "Preferă hoteluri 5 stele" },
+      { full_name: "Popa Andreea", email: "popa.andreea@gmail.com", phone: "0734567890", city: "Cluj-Napoca", status: "activ", last_tour: "Grecia 2025", tours_count: "7", notes: "Client fidel, reducere 10%" },
+      { full_name: "Marin Cristian", email: "marin.cristian@yahoo.com", phone: "0756789012", city: "Timișoara", status: "prospect", last_tour: "", tours_count: "0", notes: "Interesat de Maldive" },
+      { full_name: "Nicolescu Ioana", email: "nicolescu.ioana@gmail.com", phone: "0712345678", city: "Iași", status: "activ", last_tour: "Egipt 2025", tours_count: "3", notes: "" },
+      { full_name: "Florea Alexandru", email: "florea.alex@gmail.com", phone: "0745678901", city: "Constanța", status: "inactiv", last_tour: "Bulgaria 2024", tours_count: "1", notes: "Nu a mai răspuns la oferte" },
+      { full_name: "Stan Mihaela", email: "stan.mihaela@gmail.com", phone: "0723456789", city: "Brașov", status: "activ", last_tour: "Italia 2025", tours_count: "4", notes: "Preferă city break-uri" },
+      { full_name: "Radu George", email: "radu.george@yahoo.com", phone: "0767890123", city: "București", status: "prospect", last_tour: "", tours_count: "0", notes: "Interesat de pachete familie" },
+      { full_name: "Ionescu Roxana", email: "ionescu.roxana@gmail.com", phone: "0731234567", city: "Sibiu", status: "activ", last_tour: "Spania 2025", tours_count: "6", notes: "Preferă vacanțe culturale" },
+      { full_name: "Gheorghiu Dan", email: "gheorghiu.dan@yahoo.com", phone: "0742345678", city: "Galați", status: "activ", last_tour: "Dubai 2025", tours_count: "2", notes: "" },
+      { full_name: "Marinescu Ana", email: "marinescu.ana@gmail.com", phone: "0753456789", city: "Ploiești", status: "prospect", last_tour: "", tours_count: "0", notes: "Interesat de croaziere" },
+      { full_name: "Constantin Victor", email: "constantin.victor@gmail.com", phone: "0764567890", city: "Craiova", status: "activ", last_tour: "Grecia 2026", tours_count: "4", notes: "Rezervă mereu cu familia" },
+      { full_name: "Dumitrescu Alina", email: "dumitrescu.alina@gmail.com", phone: "0775678901", city: "Oradea", status: "inactiv", last_tour: "Turcia 2024", tours_count: "2", notes: "" },
+      { full_name: "Popescu Catalin", email: "popescu.catalin@yahoo.com", phone: "0786789012", city: "Arad", status: "activ", last_tour: "Italia 2026", tours_count: "3", notes: "Preferă hoteluri boutique" },
+      { full_name: "Niculae Maria", email: "niculae.maria@gmail.com", phone: "0797890123", city: "Pitești", status: "prospect", last_tour: "", tours_count: "0", notes: "Interesat de Japonia" },
+      { full_name: "Barbu Sorin", email: "barbu.sorin@gmail.com", phone: "0708901234", city: "Bacău", status: "activ", last_tour: "Egipt 2026", tours_count: "5", notes: "Client VIP" },
+    ];
+
+    const calendarEvents = [
+      { title: "Ședință săptămânală echipă", date: "2026-04-06", time: "10:00", duration: "60", description: "Revizuire obiective", color: "teal", created_by_name: "Alina" },
+      { title: "Prezentare oferte vara 2026", date: "2026-04-15", time: "14:00", duration: "90", description: "Pachete noi pentru clienți", color: "purple", created_by_name: "Alina" },
+      { title: "Training sistem rezervări", date: "2026-04-22", time: "11:00", duration: "120", description: "Training angajați noi", color: "amber", created_by_name: "Alina" },
+      { title: "Întâlnire furnizori", date: "2026-05-05", time: "09:00", duration: "60", description: "Negociere contracte", color: "green", created_by_name: "Alina" },
+      { title: "Ședință lunară mai", date: "2026-05-12", time: "10:00", duration: "60", description: "Raport mai", color: "teal", created_by_name: "Alina" },
+      { title: "Workshop marketing digital", date: "2026-05-20", time: "13:00", duration: "180", description: "Social media și SEO", color: "purple", created_by_name: "Alina" },
+      { title: "Ședință trimestrială", date: "2026-06-03", time: "10:00", duration: "120", description: "Raport trimestrul 2", color: "teal", created_by_name: "Alina" },
+      { title: "Lansare oferte toamnă", date: "2026-06-15", time: "14:00", duration: "90", description: "Prezentare destinații toamnă", color: "amber", created_by_name: "Alina" },
+      { title: "Team building online", date: "2026-06-26", time: "16:00", duration: "120", description: "Activitate echipă", color: "green", created_by_name: "Alina" },
+      { title: "Ședință lunară iulie", date: "2026-07-07", time: "10:00", duration: "60", description: "Raport iulie", color: "teal", created_by_name: "Alina" },
+      { title: "Evaluare performanță", date: "2026-07-20", time: "09:00", duration: "180", description: "Evaluare semestrială angajați", color: "red", created_by_name: "Alina" },
+      { title: "Planificare sezon toamnă", date: "2026-08-04", time: "10:00", duration: "90", description: "Strategie septembrie-noiembrie", color: "purple", created_by_name: "Alina" },
+      { title: "Ședință finală august", date: "2026-08-18", time: "10:00", duration: "60", description: "Raport august", color: "teal", created_by_name: "Alina" },
+    ];
+
+    const rooms = [
+      { name: "Sala Principală", description: "Sala pentru ședințe de echipă", meeting_url: "https://meet.google.com/abc-defg-hij", topic: "Ședință săptămânală", status: "available", current_participants: 0, scheduled_by_name: "Alina" },
+      { name: "Sala Vânzări", description: "Prezentări și negocieri cu clienți", meeting_url: "https://meet.google.com/klm-nopq-rst", topic: "Prezentare oferte", status: "available", current_participants: 0, scheduled_by_name: "Alina" },
+      { name: "Sala Training", description: "Sesiuni de training și onboarding", meeting_url: "https://meet.google.com/uvw-xyz-123", topic: "Training angajați", status: "available", current_participants: 0, scheduled_by_name: "Alina" },
+      { name: "Sala Marketing", description: "Brainstorming și campanii", meeting_url: "https://meet.google.com/mkt-room-456", topic: "Strategie marketing", status: "available", current_participants: 0, scheduled_by_name: "Alina" },
+    ];
+
+    console.log("👤 Adăugare clienți...");
+    for (const client of clients) await appClient.entities.Client.create(client);
+
+    console.log("📆 Adăugare calendar...");
+    for (const event of calendarEvents) await appClient.entities.CalendarEvent.create(event);
+
+    console.log("🏠 Adăugare săli...");
+    for (const room of rooms) await appClient.entities.Room.create(room);
+
+    console.log("✅ Date lipsă adăugate!");
+    return true;
+  } catch (err) {
+    console.error("❌ Eroare:", err);
+    return false;
+  }
+};

@@ -5,7 +5,7 @@ import { Users, BarChart3, Clock, CalendarCheck, CheckSquare, MessageSquare, Tre
 import StatCard from "../components/dashboard/StatCard";
 import ProductivityChart from "../components/dashboard/ProductivityChart";
 import TeamOverview from "../components/dashboard/TeamOverview";
-import { seedDatabase } from "@/lib/seedData";
+import { seedDatabase, seedMissing } from "@/lib/seedData";
 import AIInsights from "../components/dashboard/AIInsights";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -68,25 +68,31 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-
-      {/* Buton Date Demo */}
       {!seeded && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
           <div>
             <p className="font-semibold text-amber-800 text-sm">Date Demo</p>
             <p className="text-xs text-amber-600">Populează baza de date cu date de demonstrație</p>
           </div>
-          <button
-            onClick={async () => { setSeeding(true); await seedDatabase(); setSeeding(false); setSeeded(true); }}
-            disabled={seeding}
-            className="px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors"
-            style={{ backgroundColor: "#f59e0b" }}>
-            {seeding ? "Se încarcă..." : "Populează Date Demo"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={async () => { setSeeding(true); await seedDatabase(); setSeeding(false); setSeeded(true); }}
+              disabled={seeding}
+              className="px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors"
+              style={{ backgroundColor: "#f59e0b" }}>
+              {seeding ? "Se încarcă..." : "Populează Tot"}
+            </button>
+            <button
+              onClick={async () => { setSeeding(true); await seedMissing(); setSeeding(false); setSeeded(true); }}
+              disabled={seeding}
+              className="px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors"
+              style={{ backgroundColor: "#00b5b5" }}>
+              {seeding ? "Se încarcă..." : "Adaugă Date Lipsă"}
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard title="Angajați Activi" value={activeCount} subtitle={`${employees.length} total`} icon={Users} color="blue" delay={0} />
         <StatCard title="Productivitate Medie" value={`${avgProductivity}%`} subtitle="Media echipei" icon={BarChart3} color="green" delay={0.1} />
@@ -94,7 +100,6 @@ export default function Dashboard() {
         <StatCard title="Prezenți Azi" value={presentToday} subtitle={`din ${activeCount} activi`} icon={CalendarCheck} color="orange" delay={0.3} />
       </div>
 
-      {/* AI Insights - doar pentru manager */}
       {user?.isManager && (
         <AIInsights
           employees={employees}
@@ -104,7 +109,6 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Sarcini si Mesaje */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl border border-slate-200/60 p-5">
           <div className="flex items-center gap-3 mb-3">
@@ -149,7 +153,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Grafice */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3">
           <ProductivityChart logs={logs} />
@@ -159,7 +162,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Prezenta ultima saptamana */}
       <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
         <h3 className="font-semibold text-slate-900 mb-4">Prezență Ultima Săptămână</h3>
         <div className="flex items-end gap-2 h-32">
@@ -185,7 +187,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Top Angajati */}
       {topEmployees.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
           <h3 className="font-semibold text-slate-900 mb-4">Top Angajați după Productivitate</h3>
