@@ -9,6 +9,46 @@ import { seedDatabase, seedMissing } from "@/lib/seedData";
 import AIInsights from "../components/dashboard/AIInsights";
 import { useAuth } from "@/lib/AuthContext";
 
+function timeToMinutes(t) {
+  if (!t) return null;
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function calcProductivityScore(employee, attendance, tasks) {
+  const empEmail = employee.email;
+
+  // --- Prezență (40%) ---
+  const empAttendance = attendance.filter(a => a.employee_email === empEmail);
+  const totalDays = empAttendance.length;
+  const presentDays = empAttendance.filter(a => a.status === "present").length;
+  const attendanceScore = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
+
+  // --- Punctualitate (30%) ---
+  // Norma: check-in cel târziu 09:15
+  const CHECKIN_LIMIT = 9 * 60 + 15;
+  const presentRecords = empAttendance.filter(a => a.status === "present" && a.check_in);
+  const onTimeCount = presentRecords.filter(a => {
+    const mins = timeToMinutes(a.check_in);
+    return mins !== null && mins <= CHECKIN_LIMIT;
+  }).length;
+  const punctualityScore = presentRecords.length > 0 ? (onTimeCount / presentRecords.length) * 100 : 0;
+
+  // --- Sarcini finalizate (30%) ---
+  const empTasks = tasks.filter(t => t.assigned_to_email === empEmail);
+  const doneTasks = empTasks.filter(t => t.status === "done").length;
+  const tasksScore = empTasks.length > 0 ? (doneTasks / empTasks.length) * 100 : 0;
+
+  // --- Scor final ---
+  const score = Math.round(
+    attendanceScore * 0.4 +
+    punctualityScore * 0.3 +
+    tasksScore * 0.3
+  );
+
+  return Math.min(100, Math.max(0, score));
+}
+
 export default function Dashboard() {
   const [seeding, setSeeding] = useState(false);
   const [seeded, setSeeded] = useState(false);
@@ -40,9 +80,17 @@ export default function Dashboard() {
   });
 
   const activeCount = employees.filter(e => e.status === "active").length;
-  const avgProductivity = employees.length > 0
-    ? Math.round(employees.reduce((sum, e) => sum + (e.productivity_score || 0), 0) / employees.length)
+
+  // Productivitate calculată dinamic
+  const employeesWithScore = employees.map(emp => ({
+    ...emp,
+    computed_score: calcProductivityScore(emp, attendance, tasks),
+  }));
+
+  const avgProductivity = employeesWithScore.length > 0
+    ? Math.round(employeesWithScore.reduce((sum, e) => sum + e.computed_score, 0) / employeesWithScore.length)
     : 0;
+
   const totalHours = logs.reduce((sum, l) => sum + (l.hours_worked || 0), 0);
   const todayStr = new Date().toISOString().split("T")[0];
   const presentToday = attendance.filter(a => a.date === todayStr && a.status === "present").length;
@@ -50,8 +98,8 @@ export default function Dashboard() {
   const tasksTotal = tasks.length;
   const messagesTotal = messages.length;
 
-  const topEmployees = [...employees]
-    .sort((a, b) => (b.productivity_score || 0) - (a.productivity_score || 0))
+  const topEmployees = [...employeesWithScore]
+    .sort((a, b) => b.computed_score - a.computed_score)
     .slice(0, 5);
 
   const last7Days = Array.from({ length: 7 }, (_, i) => {
@@ -95,7 +143,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard title="Angajați Activi" value={activeCount} subtitle={`${employees.length} total`} icon={Users} color="blue" delay={0} />
-        <StatCard title="Productivitate Medie" value={`${avgProductivity}%`} subtitle="Media echipei" icon={BarChart3} color="green" delay={0.1} />
+        <StatCard title="Productivitate Medie" value={`${avgProductivity}%`} subtitle="Prezență + Punctualitate + Sarcini" icon={BarChart3} color="green" delay={0.1} />
         <StatCard title="Ore Lucrate Total" value={totalHours.toFixed(0)} subtitle="Toate timpurile" icon={Clock} color="purple" delay={0.2} />
         <StatCard title="Prezenți Azi" value={presentToday} subtitle={`din ${activeCount} activi`} icon={CalendarCheck} color="orange" delay={0.3} />
       </div>
@@ -121,9 +169,9 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="w-full bg-slate-100 rounded-full h-2">
-            <div className="h-2 rounded-full transition-all" style={{ width: `${tasksTotal > 0 ? (tasksDone/tasksTotal)*100 : 0}%`, backgroundColor: "#00b5b5" }} />
+            <div className="h-2 rounded-full transition-all" style={{ width: `${tasksTotal > 0 ? (tasksDone / tasksTotal) * 100 : 0}%`, backgroundColor: "#00b5b5" }} />
           </div>
-          <p className="text-xs text-slate-400 mt-1">{tasksTotal > 0 ? Math.round((tasksDone/tasksTotal)*100) : 0}% finalizate</p>
+          <p className="text-xs text-slate-400 mt-1">{tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : 0}% finalizate</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/60 p-5">
@@ -201,15 +249,16 @@ export default function Dashboard() {
                 <div className="flex-1">
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-sm font-medium text-slate-900">{emp.full_name}</span>
-                    <span className="text-xs font-bold" style={{ color: "#00b5b5" }}>{emp.productivity_score || 0}%</span>
+                    <span className="text-xs font-bold" style={{ color: "#00b5b5" }}>{emp.computed_score}%</span>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-1.5">
-                    <div className="h-1.5 rounded-full" style={{ width: `${emp.productivity_score || 0}%`, backgroundColor: "#00b5b5" }} />
+                    <div className="h-1.5 rounded-full" style={{ width: `${emp.computed_score}%`, backgroundColor: "#00b5b5" }} />
                   </div>
                 </div>
               </div>
             ))}
           </div>
+          <p className="text-xs text-slate-400 mt-4">* Scor calculat: 40% prezență + 30% punctualitate + 30% sarcini finalizate</p>
         </div>
       )}
     </div>

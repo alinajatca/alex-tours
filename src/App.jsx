@@ -15,7 +15,7 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   : <>{children}</>;
 
 function AppRoutes() {
-  const { isAuthenticated, isLoadingAuth } = useAuth();
+  const { isAuthenticated, isLoadingAuth, user } = useAuth();
 
   if (isLoadingAuth) {
     return <div className="min-h-screen flex items-center justify-center">
@@ -40,9 +40,11 @@ function AppRoutes() {
       } />
       {Object.entries(Pages).map(([path, Page]) => (
         <Route key={path} path={`/${path}`} element={
-          <LayoutWrapper currentPageName={path}>
-            <Page />
-          </LayoutWrapper>
+          path === "Dashboard" && !user?.isManager
+            ? <Navigate to="/" replace />
+            : <LayoutWrapper currentPageName={path}>
+                <Page />
+              </LayoutWrapper>
         } />
       ))}
     </Routes>

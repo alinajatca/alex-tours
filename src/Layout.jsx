@@ -16,7 +16,7 @@ const navItems = [
   { name: "Săli de Întâlnire", icon: Video, page: "Rooms" },
   { name: "Sarcini", icon: CheckSquare, page: "Tasks" },
   { name: "Fișiere", icon: FolderOpen, page: "Files" },
-  { name: "Panou Principal", icon: BarChart3, page: "Dashboard" },
+  { name: "Panou Principal", icon: BarChart3, page: "Dashboard", managerOnly: true },
   { name: "Angajați", icon: Users, page: "Employees" },
   { name: "Prezență", icon: CalendarCheck, page: "Attendance" },
   { name: "Calendar", icon: Calendar, page: "Calendar" },
@@ -62,6 +62,8 @@ export default function Layout({ children, currentPageName }) {
     setSidebarOpen(false);
   };
 
+  const visibleNavItems = navItems.filter(item => !item.managerOnly || user?.isManager);
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {sidebarOpen && (
@@ -85,7 +87,7 @@ export default function Layout({ children, currentPageName }) {
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = currentPageName === item.page;
             const isChat = item.page === "Chat";
             return (

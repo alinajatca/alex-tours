@@ -1,17 +1,17 @@
 import { appClient } from "@/api/appClient";
 
 const EMPLOYEES = [
-  { full_name: "Popescu Ion", email: "popescu.ion@alextours.ro", role: "tour_guide", department: "Operations", status: "active", productivity_score: 85, current_status: "acasa", gender: "m" },
-  { full_name: "Ionescu Maria", email: "ionescu.maria@alextours.ro", role: "booking_agent", department: "Sales", status: "active", productivity_score: 92, current_status: "acasa", gender: "f" },
-  { full_name: "Constantin Ana", email: "constantin.ana@alextours.ro", role: "marketing", department: "Marketing", status: "active", productivity_score: 78, current_status: "acasa", gender: "f" },
-  { full_name: "Gheorghe Mihai", email: "gheorghe.mihai@alextours.ro", role: "customer_support", department: "Customer Service", status: "active", productivity_score: 88, current_status: "acasa", gender: "m" },
-  { full_name: "Stanescu Elena", email: "stanescu.elena@alextours.ro", role: "finance", department: "Finance", status: "active", productivity_score: 95, current_status: "acasa", gender: "f" },
-  { full_name: "Dumitrescu Andrei", email: "dumitrescu.andrei@alextours.ro", role: "tour_guide", department: "Operations", status: "active", productivity_score: 82, current_status: "acasa", gender: "m" },
-  { full_name: "Popa Cristina", email: "popa.cristina@alextours.ro", role: "booking_agent", department: "Sales", status: "active", productivity_score: 89, current_status: "acasa", gender: "f" },
-  { full_name: "Marin Alexandru", email: "marin.alexandru@alextours.ro", role: "operations", department: "Operations", status: "active", productivity_score: 76, current_status: "acasa", gender: "m" },
-  { full_name: "Nistor Laura", email: "nistor.laura@alextours.ro", role: "marketing", department: "Marketing", status: "active", productivity_score: 91, current_status: "acasa", gender: "f" },
-  { full_name: "Florea Bogdan", email: "florea.bogdan@alextours.ro", role: "customer_support", department: "Customer Service", status: "active", productivity_score: 84, current_status: "acasa", gender: "m" },
-  { full_name: "Rusu Ioana", email: "rusu.ioana@alextours.ro", role: "finance", department: "Finance", status: "active", productivity_score: 93, current_status: "acasa", gender: "f" },
+  { full_name: "Popescu Ion", email: "popescu.ion@alextours.ro", role: "tour_guide", department: "Operations", status: "active", current_status: "acasa", gender: "m" },
+  { full_name: "Ionescu Maria", email: "ionescu.maria@alextours.ro", role: "booking_agent", department: "Sales", status: "active", current_status: "acasa", gender: "f" },
+  { full_name: "Constantin Ana", email: "constantin.ana@alextours.ro", role: "marketing", department: "Marketing", status: "active", current_status: "acasa", gender: "f" },
+  { full_name: "Gheorghe Mihai", email: "gheorghe.mihai@alextours.ro", role: "customer_support", department: "Customer Service", status: "active", current_status: "acasa", gender: "m" },
+  { full_name: "Stanescu Elena", email: "stanescu.elena@alextours.ro", role: "finance", department: "Finance", status: "active", current_status: "acasa", gender: "f" },
+  { full_name: "Dumitrescu Andrei", email: "dumitrescu.andrei@alextours.ro", role: "tour_guide", department: "Operations", status: "active", current_status: "acasa", gender: "m" },
+  { full_name: "Popa Cristina", email: "popa.cristina@alextours.ro", role: "booking_agent", department: "Sales", status: "active", current_status: "acasa", gender: "f" },
+  { full_name: "Marin Alexandru", email: "marin.alexandru@alextours.ro", role: "operations", department: "Operations", status: "active", current_status: "acasa", gender: "m" },
+  { full_name: "Nistor Laura", email: "nistor.laura@alextours.ro", role: "marketing", department: "Marketing", status: "active", current_status: "acasa", gender: "f" },
+  { full_name: "Florea Bogdan", email: "florea.bogdan@alextours.ro", role: "customer_support", department: "Customer Service", status: "active", current_status: "acasa", gender: "m" },
+  { full_name: "Rusu Ioana", email: "rusu.ioana@alextours.ro", role: "finance", department: "Finance", status: "active", current_status: "acasa", gender: "f" },
 ];
 
 const SCHEDULE = [
