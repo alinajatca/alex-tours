@@ -8,8 +8,9 @@ import {
   doc,
   query,
   limit,
+  orderBy,
 } from "firebase/firestore";
-
+ 
 const createEntity = (collectionName) => ({
   list: async (maxItems = 100) => {
     const q = query(collection(db, collectionName), limit(maxItems));
@@ -32,7 +33,42 @@ const createEntity = (collectionName) => ({
     return { id };
   },
 });
-
+ 
+const createAnnouncementEntity = () => ({
+  list: async (maxItems = 20) => {
+    try {
+      const q = query(
+        collection(db, "announcements"),
+        orderBy("created_date", "desc"),
+        limit(maxItems)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    } catch {
+      const q = query(collection(db, "announcements"), limit(maxItems));
+      const snapshot = await getDocs(q);
+      return snapshot.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+    }
+  },
+  create: async (data) => {
+    const docRef = await addDoc(collection(db, "announcements"), {
+      ...data,
+      created_date: new Date().toISOString(),
+    });
+    return { id: docRef.id, ...data };
+  },
+  update: async (id, data) => {
+    await updateDoc(doc(db, "announcements", id), data);
+    return { id, ...data };
+  },
+  delete: async (id) => {
+    await deleteDoc(doc(db, "announcements", id));
+    return { id };
+  },
+});
+ 
 export const appClient = {
   entities: {
     Employee: createEntity("employees"),
@@ -45,5 +81,6 @@ export const appClient = {
     ProductivityLog: createEntity("productivity_logs"),
     CalendarEvent: createEntity("calendar_events"),
     Client: createEntity("clients"),
+    Announcement: createAnnouncementEntity(),
   },
 };
