@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 const CLOUDINARY_CLOUD_NAME = "dzg4ywdzf";
 const CLOUDINARY_UPLOAD_PRESET = "alex-tours";
 
-const FOLDERS = ["General", "Tours", "Marketing", "Finance", "HR", "Contracts"];
+const FOLDERS = ["General", "Tururi", "Marketing", "Finanțe", "HR", "Contracte", "Teambuilding"];
 
 const getFileIcon = (name) => {
   if (!name) return File;

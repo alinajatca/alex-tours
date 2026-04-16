@@ -1,31 +1,32 @@
 import React, { useState } from "react";
 import { appClient } from "@/api/appClient";
-import { Users, MessageSquare, Video, CheckSquare, FolderOpen, Wifi, Bell, Plus, Trash2, X, AlertTriangle } from "lucide-react";
+import { Users, MessageSquare, Video, CheckSquare, FolderOpen, Wifi, Bell, Plus, Trash2, X, AlertTriangle, Smile } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion as Motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
- 
+import { format } from "date-fns";
+
 const officeAreas = [
   { label: "Chat Echipă", icon: MessageSquare, page: "Chat", description: "Canale și mesaje directe" },
   { label: "Săli de Întâlnire", icon: Video, page: "Rooms", description: "Apeluri video și săli live" },
   { label: "Sarcini", icon: CheckSquare, page: "Tasks", description: "Atribuie și urmărește munca" },
   { label: "Fișiere", icon: FolderOpen, page: "Files", description: "Documente și fișiere partajate" },
 ];
- 
+
 const STATUS_COLORS = {
   acasa: "#00b5b5", teren: "#f59e0b", sedinta: "#8b5cf6",
   pauza: "#64748b", indisponibil: "#ef4444"
 };
- 
+
 const STATUS_LABELS = {
   acasa: "Acasă", teren: "În teren", sedinta: "În ședință",
   pauza: "Pauză", indisponibil: "Indisponibil"
 };
- 
+
 const MANAGER_EMAIL = "alinajatca@gmail.com";
- 
+
 const socialLinks = [
   {
     label: "Facebook",
@@ -58,7 +59,7 @@ const socialLinks = [
     ),
   },
 ];
- 
+
 function formatDate(isoString) {
   if (!isoString) return "";
   const date = new Date(isoString);
@@ -73,38 +74,48 @@ function formatDate(isoString) {
   if (diffD === 1) return "Ieri";
   return date.toLocaleDateString("ro-RO", { day: "numeric", month: "short" });
 }
- 
+
 export default function VirtualOffice() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isManager = user?.email === MANAGER_EMAIL;
- 
+
   const [showModal, setShowModal] = useState(false);
   const [newText, setNewText] = useState("");
   const [newUrgent, setNewUrgent] = useState(false);
- 
+  const [selectedMood, setSelectedMood] = useState(null);
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const weekStr = format(new Date(), "yyyy-'W'ww");
+
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
     queryFn: () => appClient.entities.Employee.list(),
     refetchInterval: 30000,
   });
- 
+
   const { data: tasks = [] } = useQuery({
     queryKey: ["tasks"],
     queryFn: () => appClient.entities.Task.list(),
   });
- 
+
   const { data: rooms = [] } = useQuery({
     queryKey: ["rooms"],
     queryFn: () => appClient.entities.Room.list(),
   });
- 
+
   const { data: announcements = [] } = useQuery({
     queryKey: ["announcements"],
     queryFn: () => appClient.entities.Announcement.list(),
     refetchInterval: 60000,
   });
- 
+
+  const { data: moodVotes = [] } = useQuery({
+    queryKey: ["mood-votes"],
+    queryFn: () => appClient.entities.MoodVote.list(),
+    refetchInterval: 30000,
+  });
+
   const createMutation = useMutation({
     mutationFn: (data) => appClient.entities.Announcement.create(data),
     onSuccess: () => {
@@ -114,12 +125,17 @@ export default function VirtualOffice() {
       setShowModal(false);
     },
   });
- 
+
   const deleteMutation = useMutation({
     mutationFn: (id) => appClient.entities.Announcement.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["announcements"] }),
   });
- 
+
+  const moodMutation = useMutation({
+    mutationFn: (data) => appClient.entities.MoodVote.create(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mood-votes"] }),
+  });
+
   const handleCreate = () => {
     if (!newText.trim()) return;
     createMutation.mutate({
@@ -128,14 +144,35 @@ export default function VirtualOffice() {
       author: user?.full_name || user?.email,
     });
   };
- 
+
+  const handleMoodVote = async (mood) => {
+    if (myVote) return;
+    setSelectedMood(mood);
+    await moodMutation.mutateAsync({
+      employee_email: user?.email,
+      employee_name: user?.full_name,
+      mood,
+      week: weekStr,
+      date: todayStr,
+    });
+  };
+
   const activeRooms = rooms.filter(r => r.status === "in_use").length;
   const myTasks = tasks.filter(t => t.assigned_to_email === user?.email && t.status !== "done").length;
   const onlineCount = employees.filter(e => e.status === "active").length;
- 
+
+  const thisWeekVotes = moodVotes.filter(v => v.week === weekStr);
+  const myVote = thisWeekVotes.find(v => v.employee_email === user?.email);
+  const moodCounts = {
+    "😊": thisWeekVotes.filter(v => v.mood === "😊").length,
+    "😐": thisWeekVotes.filter(v => v.mood === "😐").length,
+    "😔": thisWeekVotes.filter(v => v.mood === "😔").length,
+  };
+  const totalVotes = Object.values(moodCounts).reduce((a, b) => a + b, 0);
+
   return (
     <div className="space-y-8">
- 
+
       {/* Banner bun venit */}
       <Motion.div
         initial={{ opacity: 0, y: 16 }}
@@ -168,7 +205,7 @@ export default function VirtualOffice() {
           </div>
         </div>
       </Motion.div>
- 
+
       {/* Canale oficiale */}
       <Motion.div
         initial={{ opacity: 0, y: 16 }}
@@ -198,7 +235,7 @@ export default function VirtualOffice() {
           ))}
         </div>
       </Motion.div>
- 
+
       {/* Carduri navigare */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {officeAreas.map((area, i) => (
@@ -217,10 +254,68 @@ export default function VirtualOffice() {
           </Motion.div>
         ))}
       </div>
- 
+
+      {/* Mood Board - vizibil tuturor */}
+      <Motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+        className="bg-white rounded-2xl border border-slate-200/60 p-6"
+      >
+        <h3 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
+          <Smile className="h-4 w-4 text-pink-400" /> Starea Echipei Săptămâna Aceasta
+        </h3>
+        <p className="text-xs text-slate-400 mb-4">Votul este anonim — cum te simți în această săptămână?</p>
+        <div className="flex flex-col sm:flex-row gap-6 items-start">
+          <div className="flex gap-3">
+            {["😊", "😐", "😔"].map(mood => (
+              <button key={mood} onClick={() => handleMoodVote(mood)}
+                disabled={!!myVote}
+                className="flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all"
+                style={{
+                  borderColor: myVote?.mood === mood ? "#00b5b5" : "#e2e8f0",
+                  backgroundColor: myVote?.mood === mood ? "#f0fafa" : "white",
+                  opacity: myVote && myVote.mood !== mood ? 0.5 : 1,
+                  cursor: myVote ? "not-allowed" : "pointer",
+                  transform: (selectedMood === mood || myVote?.mood === mood) ? "scale(1.1)" : "scale(1)",
+                }}>
+                <span style={{ fontSize: "28px" }}>{mood}</span>
+                <span className="text-xs text-slate-500">
+                  {mood === "😊" ? "Bine" : mood === "😐" ? "Ok" : "Greu"}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {totalVotes > 0 ? (
+            <div className="flex-1 space-y-2">
+              {[
+                { mood: "😊", label: "Bine", color: "#1d9e75" },
+                { mood: "😐", label: "Ok", color: "#f59e0b" },
+                { mood: "😔", label: "Greu", color: "#ef4444" },
+              ].map(({ mood, label, color }) => (
+                <div key={mood} className="flex items-center gap-3">
+                  <span style={{ fontSize: "16px" }}>{mood}</span>
+                  <span className="text-xs text-slate-500 w-8">{label}</span>
+                  <div className="flex-1 bg-slate-100 rounded-full h-2">
+                    <div className="h-2 rounded-full transition-all"
+                      style={{ width: `${totalVotes > 0 ? (moodCounts[mood] / totalVotes) * 100 : 0}%`, backgroundColor: color }} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-600 w-8">{moodCounts[mood]}</span>
+                </div>
+              ))}
+              <p className="text-xs text-slate-400">{totalVotes} voturi din {onlineCount} angajați activi</p>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400 self-center">Niciun vot încă în această săptămână</p>
+          )}
+        </div>
+        {myVote && <p className="text-xs text-slate-400 mt-3">✓ Ai votat această săptămână</p>}
+      </Motion.div>
+
       {/* Anunțuri + Echipă Online */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
- 
+
         {/* Anunțuri */}
         <Motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -249,7 +344,7 @@ export default function VirtualOffice() {
               </button>
             )}
           </div>
- 
+
           <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
             {announcements.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-6">Niciun anunț momentan</p>
@@ -291,7 +386,7 @@ export default function VirtualOffice() {
             )}
           </div>
         </Motion.div>
- 
+
         {/* Echipă Online */}
         <Motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -323,8 +418,8 @@ export default function VirtualOffice() {
           </div>
         </Motion.div>
       </div>
- 
-      {/* Modal adaugă anunț — doar manager */}
+
+      {/* Modal adaugă anunț */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <Motion.div
@@ -338,7 +433,6 @@ export default function VirtualOffice() {
                 <X className="h-5 w-5" />
               </button>
             </div>
- 
             <textarea
               value={newText}
               onChange={(e) => setNewText(e.target.value)}
@@ -346,7 +440,6 @@ export default function VirtualOffice() {
               rows={4}
               className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 resize-none focus:outline-none focus:ring-2 focus:ring-[#00b5b5] mb-4"
             />
- 
             <label className="flex items-center gap-2 mb-5 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -357,7 +450,6 @@ export default function VirtualOffice() {
               <AlertTriangle className="h-4 w-4 text-red-400" />
               <span className="text-sm text-slate-600">Marchează ca urgent</span>
             </label>
- 
             <div className="flex gap-3">
               <button
                 onClick={() => setShowModal(false)}
@@ -380,4 +472,3 @@ export default function VirtualOffice() {
     </div>
   );
 }
- 

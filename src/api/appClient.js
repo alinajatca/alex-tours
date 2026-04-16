@@ -82,5 +82,6 @@ export const appClient = {
     CalendarEvent: createEntity("calendar_events"),
     Client: createEntity("clients"),
     Announcement: createAnnouncementEntity(),
+    MoodVote: createEntity("mood_votes"),
   },
 };
