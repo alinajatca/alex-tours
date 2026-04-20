@@ -38,8 +38,6 @@ const pageNames = {
 };
 
 const WORK_START = 9 * 60;
-const WORK_END = 17 * 60;
-const WORK_DURATION = WORK_END - WORK_START;
 
 function WorkClock() {
   const [now, setNow] = useState(new Date());
@@ -57,9 +55,14 @@ function WorkClock() {
   const timeStr = now.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
   const dateStr = now.toLocaleDateString("ro-RO", { weekday: "short", day: "numeric", month: "short" });
 
-  const isWorkTime = currentMinutes >= WORK_START && currentMinutes < WORK_END;
-  const beforeWork = currentMinutes < WORK_START;
-  const afterWork = currentMinutes >= WORK_END;
+ const dayOfWeek = now.getDay();
+const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+const WORK_END = isWeekend ? WORK_START : 17 * 60;
+const WORK_DURATION = WORK_END - WORK_START;
+const isWorkTime = !isWeekend && currentMinutes >= WORK_START && currentMinutes < WORK_END;
+const beforeWork = !isWeekend && currentMinutes < WORK_START;
+const afterWork = isWeekend || currentMinutes >= WORK_END;
+if (isWeekend) { statusLabel = "zi liberă"; statusColor = "#94a3b8"; }
 
   let progress = 0;
   let remainingStr = "";

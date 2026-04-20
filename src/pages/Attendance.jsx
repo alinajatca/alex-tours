@@ -65,7 +65,7 @@ export default function Attendance() {
 
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["attendance"],
-    queryFn: () => appClient.entities.Attendance.list(200),
+    queryFn: () => appClient.entities.Attendance.list(500),
     refetchInterval: 30000,
   });
 
@@ -76,10 +76,13 @@ export default function Attendance() {
   });
 
   const { data: leaveRequests = [] } = useQuery({
-    queryKey: ["leave-requests"],
-    queryFn: () => appClient.entities.LeaveRequest.list(),
-    refetchInterval: 30000,
-  });
+  queryKey: ["leave-requests", user?.email, user?.isManager],
+  queryFn: () => appClient.entities.LeaveRequest.list(user?.isManager ? 200 : 50),
+  refetchInterval: 30000,
+  select: (data) => user?.isManager
+    ? data
+    : data.filter(r => r.employee_email === user?.email),
+});
 
   const createRecordMutation = useMutation({
     mutationFn: (data) => appClient.entities.Attendance.create(data),
