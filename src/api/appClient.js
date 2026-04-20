@@ -83,5 +83,6 @@ export const appClient = {
     Client: createEntity("clients"),
     Announcement: createAnnouncementEntity(),
     MoodVote: createEntity("mood_votes"),
+    LeaveRequest: createEntity("leave_requests"),
   },
 };

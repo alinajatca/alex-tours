@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/lib/AuthContext";
@@ -37,6 +37,100 @@ const pageNames = {
   Clients: "Clienți",
 };
 
+const WORK_START = 9 * 60;
+const WORK_END = 17 * 60;
+const WORK_DURATION = WORK_END - WORK_START;
+
+function WorkClock() {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const seconds = now.getSeconds();
+  const currentMinutes = hours * 60 + minutes;
+
+  const timeStr = now.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
+  const dateStr = now.toLocaleDateString("ro-RO", { weekday: "short", day: "numeric", month: "short" });
+
+  const isWorkTime = currentMinutes >= WORK_START && currentMinutes < WORK_END;
+  const beforeWork = currentMinutes < WORK_START;
+  const afterWork = currentMinutes >= WORK_END;
+
+  let progress = 0;
+  let remainingStr = "";
+  let statusColor = "#00b5b5";
+  let statusLabel = "";
+
+  if (isWorkTime) {
+    const elapsed = currentMinutes - WORK_START;
+    progress = Math.min((elapsed / WORK_DURATION) * 100, 100);
+    const remaining = WORK_END - currentMinutes;
+    const rh = Math.floor(remaining / 60);
+    const rm = remaining % 60;
+    remainingStr = rh > 0 ? `${rh}h ${rm}m` : `${rm}m`;
+
+    if (progress < 33) statusColor = "#00b5b5";
+    else if (progress < 66) statusColor = "#f59e0b";
+    else statusColor = "#ef4444";
+
+    statusLabel = `mai rămâne ${remainingStr}`;
+  } else if (beforeWork) {
+    progress = 0;
+    const minutesBefore = WORK_START - currentMinutes;
+    const bh = Math.floor(minutesBefore / 60);
+    const bm = minutesBefore % 60;
+    remainingStr = bh > 0 ? `${bh}h ${bm}m` : `${bm}m`;
+    statusColor = "#94a3b8";
+    statusLabel = `începe în ${remainingStr}`;
+  } else {
+    progress = 100;
+    statusColor = "#64748b";
+    statusLabel = "program încheiat";
+  }
+
+  const circumference = 2 * Math.PI * 20;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/60">
+      <div className="relative flex-shrink-0" style={{ width: 48, height: 48 }}>
+        <svg width="48" height="48" viewBox="0 0 48 48">
+          <circle cx="24" cy="24" r="20" fill="none" stroke="#e2e8f0" strokeWidth="3.5" />
+          <circle
+            cx="24" cy="24" r="20"
+            fill="none"
+            stroke={statusColor}
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            transform="rotate(-90 24 24)"
+            style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span style={{ fontSize: "9px", fontWeight: 600, color: statusColor, lineHeight: 1 }}>
+            {afterWork ? "✓" : beforeWork ? "–" : `${Math.round(progress)}%`}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex flex-col min-w-0">
+        <span className="text-sm font-bold text-slate-900 leading-tight">{timeStr}</span>
+        <span className="text-xs text-slate-400 leading-tight">{dateStr}</span>
+        <span className="text-xs leading-tight font-medium mt-0.5" style={{ color: statusColor }}>
+          {statusLabel}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { logout, user } = useAuth();
@@ -74,7 +168,7 @@ export default function Layout({ children, currentPageName }) {
         transform transition-transform duration-300 ease-out flex flex-col
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
         style={{ backgroundColor: "#1a3a3a" }}>
-        
+
         <div className="p-6 flex items-center gap-3 border-b border-white/10">
           <img src="/logo.jpg" alt="Alex Tours" className="h-12 w-12 rounded-xl object-cover flex-shrink-0" />
           <div>
@@ -137,6 +231,9 @@ export default function Layout({ children, currentPageName }) {
             <h2 className="text-xl font-bold text-slate-900 tracking-tight">
               {pageNames[currentPageName] || currentPageName}
             </h2>
+          </div>
+          <div className="ml-auto">
+            <WorkClock />
           </div>
         </header>
 

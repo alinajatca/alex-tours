@@ -4,22 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { app } from "@/lib/firebase";
-import { appClient } from "@/api/appClient";
 import { Shield, Eye, EyeOff } from "lucide-react";
-
-const auth = getAuth(app);
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState("booking_agent");
-  const [department, setDepartment] = useState("Sales");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -40,34 +31,6 @@ export default function Login() {
     setLoading(false);
   };
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    if (!gdprAccepted) { setError("Trebuie să accepți politica de confidențialitate!"); return; }
-    setLoading(true);
-    setError("");
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(userCredential.user, { displayName: fullName });
-      await appClient.entities.Employee.create({
-        full_name: fullName,
-        email: email,
-        role: role,
-        department: department,
-        status: "active",
-      });
-      navigate("/");
-    } catch (err) {
-      if (err.code === "auth/email-already-in-use") {
-        setError("Emailul este deja folosit!");
-      } else if (err.code === "auth/weak-password") {
-        setError("Parola trebuie să aibă cel puțin 6 caractere!");
-      } else {
-        setError("Eroare la creare cont: " + err.message);
-      }
-    }
-    setLoading(false);
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl border border-slate-200/60 p-8 w-full max-w-md shadow-sm">
@@ -79,19 +42,12 @@ export default function Login() {
           </div>
         </div>
 
-        <h2 className="text-xl font-bold text-slate-900 mb-6">
-          {isRegister ? "Creare cont" : "Autentificare"}
-        </h2>
+        <h2 className="text-xl font-bold text-slate-900 mb-2">Autentificare</h2>
+        <p className="text-xs text-slate-400 mb-6">Conturile sunt create de managerul echipei.</p>
 
         {error && <p className="text-red-500 text-sm mb-4 bg-red-50 p-3 rounded-lg">{error}</p>}
 
-        <form onSubmit={isRegister ? handleRegister : handleLogin} className="space-y-4">
-          {isRegister && (
-            <div className="space-y-1.5">
-              <Label className="text-xs text-slate-500">Nume complet *</Label>
-              <Input value={fullName} onChange={e => setFullName(e.target.value)} required placeholder="Ion Popescu" />
-            </div>
-          )}
+        <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs text-slate-500">Email *</Label>
             <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
@@ -107,35 +63,7 @@ export default function Login() {
               </button>
             </div>
           </div>
-          {isRegister && (
-            <>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-slate-500">Rol</Label>
-                <select value={role} onChange={e => setRole(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm">
-                  <option value="tour_guide">Ghid Turistic</option>
-                  <option value="booking_agent">Agent Rezervări</option>
-                  <option value="customer_support">Suport Clienți</option>
-                  <option value="marketing">Marketing</option>
-                  <option value="operations">Operațiuni</option>
-                  <option value="finance">Finanțe</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-slate-500">Departament</Label>
-                <select value={department} onChange={e => setDepartment(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm">
-                  <option value="Sales">Vânzări</option>
-                  <option value="Operations">Operațiuni</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Finance">Finanțe</option>
-                  <option value="Customer Service">Relații Clienți</option>
-                </select>
-              </div>
-            </>
-          )}
 
-          {/* GDPR */}
           <div className="flex items-start gap-2 pt-1">
             <input type="checkbox" id="gdpr" checked={gdprAccepted}
               onChange={e => setGdprAccepted(e.target.checked)}
@@ -151,7 +79,6 @@ export default function Login() {
             </label>
           </div>
 
-          {/* Text GDPR expandabil */}
           {showGdpr && (
             <div className="bg-slate-50 rounded-xl p-4 text-xs text-slate-500 space-y-2 max-h-40 overflow-y-auto">
               <div className="flex items-center gap-2 mb-2">
@@ -170,17 +97,9 @@ export default function Login() {
           <Button type="submit" disabled={loading || !gdprAccepted}
             className="w-full"
             style={{ backgroundColor: gdprAccepted ? "#00b5b5" : "#94a3b8" }}>
-            {loading ? "Se procesează..." : isRegister ? "Creează cont" : "Intră în cont"}
+            {loading ? "Se procesează..." : "Intră în cont"}
           </Button>
         </form>
-
-        <p className="text-center text-sm text-slate-500 mt-4">
-          {isRegister ? "Ai deja cont?" : "Nu ai cont?"}{" "}
-          <button onClick={() => { setIsRegister(!isRegister); setError(""); setGdprAccepted(false); }}
-            className="font-medium hover:underline" style={{ color: "#00b5b5" }}>
-            {isRegister ? "Autentifică-te" : "Creează cont"}
-          </button>
-        </p>
       </div>
     </div>
   );

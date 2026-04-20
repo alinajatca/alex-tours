@@ -187,7 +187,7 @@ export default function VirtualOffice() {
               <span className="text-sm font-medium" style={{ color: "#00b5b5" }}>Birou Virtual · Online</span>
             </div>
             <h1 className="text-3xl font-bold mb-1">Bun venit{user?.full_name ? `, ${user.full_name.split(" ")[0]}` : ""}! 👋</h1>
-            <p className="text-slate-300 text-sm">Alex Tours Virtual — tot ce are nevoie echipa ta într-un singur loc.</p>
+            <p className="text-slate-300 text-sm">Teamora — tot ce are nevoie echipa ta într-un singur loc.</p>
           </div>
           <div className="flex gap-6 text-center">
             <div>
