@@ -49,38 +49,36 @@ function WorkClock() {
 
   const hours = now.getHours();
   const minutes = now.getMinutes();
-  const seconds = now.getSeconds();
   const currentMinutes = hours * 60 + minutes;
-
   const timeStr = now.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
   const dateStr = now.toLocaleDateString("ro-RO", { weekday: "short", day: "numeric", month: "short" });
 
- const dayOfWeek = now.getDay();
-const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-const WORK_END = isWeekend ? WORK_START : 17 * 60;
-const WORK_DURATION = WORK_END - WORK_START;
-const isWorkTime = !isWeekend && currentMinutes >= WORK_START && currentMinutes < WORK_END;
-const beforeWork = !isWeekend && currentMinutes < WORK_START;
-const afterWork = isWeekend || currentMinutes >= WORK_END;
-if (isWeekend) { statusLabel = "zi liberă"; statusColor = "#94a3b8"; }
+  const dayOfWeek = now.getDay();
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const WORK_END = isWeekend ? WORK_START : 17 * 60;
+  const WORK_DURATION = WORK_END - WORK_START;
+  const isWorkTime = !isWeekend && currentMinutes >= WORK_START && currentMinutes < WORK_END;
+  const beforeWork = !isWeekend && currentMinutes < WORK_START;
+  const afterWork = isWeekend || currentMinutes >= WORK_END;
 
   let progress = 0;
   let remainingStr = "";
   let statusColor = "#00b5b5";
   let statusLabel = "";
 
-  if (isWorkTime) {
+  if (isWeekend) {
+    statusColor = "#94a3b8";
+    statusLabel = "zi liberă";
+  } else if (isWorkTime) {
     const elapsed = currentMinutes - WORK_START;
     progress = Math.min((elapsed / WORK_DURATION) * 100, 100);
     const remaining = WORK_END - currentMinutes;
     const rh = Math.floor(remaining / 60);
     const rm = remaining % 60;
     remainingStr = rh > 0 ? `${rh}h ${rm}m` : `${rm}m`;
-
     if (progress < 33) statusColor = "#00b5b5";
     else if (progress < 66) statusColor = "#f59e0b";
     else statusColor = "#ef4444";
-
     statusLabel = `mai rămâne ${remainingStr}`;
   } else if (beforeWork) {
     progress = 0;
@@ -104,17 +102,10 @@ if (isWeekend) { statusLabel = "zi liberă"; statusColor = "#94a3b8"; }
       <div className="relative flex-shrink-0" style={{ width: 48, height: 48 }}>
         <svg width="48" height="48" viewBox="0 0 48 48">
           <circle cx="24" cy="24" r="20" fill="none" stroke="#e2e8f0" strokeWidth="3.5" />
-          <circle
-            cx="24" cy="24" r="20"
-            fill="none"
-            stroke={statusColor}
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
+          <circle cx="24" cy="24" r="20" fill="none" stroke={statusColor} strokeWidth="3.5"
+            strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
             transform="rotate(-90 24 24)"
-            style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s" }}
-          />
+            style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s" }} />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
           <span style={{ fontSize: "9px", fontWeight: 600, color: statusColor, lineHeight: 1 }}>
@@ -122,7 +113,6 @@ if (isWeekend) { statusLabel = "zi liberă"; statusColor = "#94a3b8"; }
           </span>
         </div>
       </div>
-
       <div className="flex flex-col min-w-0">
         <span className="text-sm font-bold text-slate-900 leading-tight">{timeStr}</span>
         <span className="text-xs text-slate-400 leading-tight">{dateStr}</span>
