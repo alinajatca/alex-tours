@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard, Users, BarChart3, CalendarCheck, Menu, X, LogOut,
   ChevronRight, MessageSquare, Video, CheckSquare, FolderOpen,
-  Calendar, UserCheck
+  Calendar, UserCheck, Sparkles, Send, Loader2
 } from "lucide-react";
 
 const navItems = [
@@ -38,6 +38,13 @@ const pageNames = {
 };
 
 const WORK_START = 9 * 60;
+
+const QUICK_ACTIONS = [
+  { id: "prioritizeaza", label: "Prioritizează sarcinile", prompt: "Ajută-mă să prioritizez sarcinile mele de lucru: " },
+  { id: "email", label: "Redactează un email", prompt: "Ajută-mă să redactez un email profesional pentru: " },
+  { id: "plan", label: "Plan de acțiune", prompt: "Creează un plan de acțiune pas cu pas pentru: " },
+  { id: "feedback", label: "Analizează feedback", prompt: "Analizează următorul feedback și sugerează cum să răspund: " },
+];
 
 function WorkClock() {
   const [now, setNow] = useState(new Date());
@@ -121,6 +128,144 @@ function WorkClock() {
         </span>
       </div>
     </div>
+  );
+}
+
+function AIAssistant({ currentPageName }) {
+  const [showChat, setShowChat] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatHistory, setChatHistory] = useState([]);
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const sendChatMessage = async (messageText) => {
+    const text = messageText || chatInput;
+    if (!text.trim()) return;
+    setChatInput("");
+    setChatLoading(true);
+    const newHistory = [...chatHistory, { role: "user", content: text }];
+    setChatHistory(newHistory);
+    try {
+      const systemContext = `Ești un asistent AI pentru angajații agenției de turism Alex Tours din România.
+Ajuți cu: prioritizarea sarcinilor, redactarea documentelor și emailurilor profesionale, planuri de acțiune, organizarea muncii, analiza feedback-ului.
+Răspunde în română, profesionist și concis.`;
+      const response = await fetch("/api/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 800,
+          system: systemContext,
+          messages: newHistory,
+        }),
+      });
+      const data = await response.json();
+      const reply = data?.content?.[0]?.text || "Nu am putut genera un răspuns.";
+      setChatHistory([...newHistory, { role: "assistant", content: reply }]);
+    } catch (err) {
+      setChatHistory([...newHistory, { role: "assistant", content: "Eroare de conexiune. Încearcă din nou." }]);
+    }
+    setChatLoading(false);
+  };
+
+  return (
+    <>
+      {/* Buton fix */}
+      <button onClick={() => setShowChat(true)}
+  className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-2xl text-white font-medium text-sm shadow-lg hover:-translate-y-1 transition-all duration-200"
+  style={{ backgroundColor: "#f59e0b", display: currentPageName === "Chat" ? "none" : "flex" }}>
+        <Sparkles className="h-5 w-5" />
+        <span className="hidden sm:inline">Asistent AI</span>
+      </button>
+
+      {/* Modal chat */}
+      {showChat && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-end p-4 sm:p-6">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-xl">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#fffbeb" }}>
+                  <Sparkles className="h-4 w-4" style={{ color: "#f59e0b" }} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900 text-sm">Asistent Personal AI</h3>
+                  <p className="text-xs text-slate-400">Ajutor cu documente, organizare și feedback</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowChat(false); setChatHistory([]); setChatInput(""); }}
+                className="text-slate-400 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {chatHistory.length === 0 && (
+              <div className="p-4 border-b border-slate-100">
+                <p className="text-xs text-slate-400 mb-3">Acțiuni rapide:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {QUICK_ACTIONS.map(action => (
+                    <button key={action.id}
+                      onClick={() => setChatInput(action.prompt)}
+                      className="flex items-center gap-2 p-3 rounded-xl border border-slate-200 text-left hover:border-amber-300 hover:bg-amber-50 transition-all">
+                      <span className="text-xs font-medium text-slate-700">{action.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {chatHistory.length === 0 && (
+                <div className="text-center py-8">
+                  <Sparkles className="h-8 w-8 mx-auto mb-3" style={{ color: "#f59e0b" }} />
+                  <p className="text-sm text-slate-500">Bună! Cum te pot ajuta astăzi?</p>
+                  <p className="text-xs text-slate-400 mt-1">Alege o acțiune rapidă sau scrie direct.</p>
+                </div>
+              )}
+              {chatHistory.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${msg.role === "user" ? "text-white rounded-br-sm" : "bg-slate-100 text-slate-800 rounded-bl-sm"}`}
+                    style={msg.role === "user" ? { backgroundColor: "#00b5b5" } : {}}>
+                    {msg.content.split("\n").map((line, j) => (
+                      <p key={j} className={line === "" ? "mb-2" : "mb-0.5"}>
+                        {line.replace(/\*\*(.*?)\*\*/g, "$1")}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-slate-100 rounded-2xl rounded-bl-sm px-4 py-3">
+                    <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-100">
+              <div className="flex gap-2">
+                <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendChatMessage()}
+                  placeholder="Scrie o întrebare sau cerere..."
+                  className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                  disabled={chatLoading} />
+                <button onClick={() => sendChatMessage()}
+                  disabled={!chatInput.trim() || chatLoading}
+                  className="px-4 py-2.5 rounded-xl text-white font-medium text-sm disabled:opacity-50"
+                  style={{ backgroundColor: "#f59e0b" }}>
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+              {chatHistory.length > 0 && (
+                <button onClick={() => setChatHistory([])}
+                  className="text-xs text-slate-400 hover:text-slate-600 mt-2 w-full text-center">
+                  Șterge conversația
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -234,6 +379,9 @@ export default function Layout({ children, currentPageName }) {
           {children}
         </main>
       </div>
+
+      {/* Asistent AI - fix pe toate paginile */}
+      <AIAssistant user={user} currentPageName={currentPageName} />
     </div>
   );
 }

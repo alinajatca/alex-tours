@@ -179,7 +179,7 @@ Răspunde întotdeauna în limba română, profesionist și concis.`;
       const data = await response.json();
       const reply = data?.content?.[0]?.text || "Nu am putut genera un răspuns.";
       setChatHistory([...newHistory, { role: "assistant", content: reply }]);
-    } catch (err) {
+    } catch (err_) {
       setChatHistory([...newHistory, { role: "assistant", content: "Eroare de conexiune. Încearcă din nou." }]);
     }
     setChatLoading(false);

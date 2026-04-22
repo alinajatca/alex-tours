@@ -132,7 +132,7 @@ export default function Dashboard() {
 
   const heatmapData = HEATMAP_DAYS.map((day, di) => {
     return HEATMAP_HOURS.map(hour => {
-      const last5Days = Array.from({ length: 5 }, (_, i) => {
+      const last5Days = Array.from({ length: 5 }, () => {
         const d = new Date();
         const dayOfWeek = d.getDay();
         const diff = dayOfWeek - 1 - di;

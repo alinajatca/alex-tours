@@ -29,8 +29,8 @@ const priorityLabels = { low: "Scăzut", medium: "Mediu", high: "Ridicat" };
 const QUICK_ACTIONS = [
   { id: "prioritizeaza", label: "Prioritizează sarcinile mele", prompt: "Ajută-mă să prioritizez sarcinile mele de lucru. Am următoarele sarcini: " },
   { id: "descriere", label: "Scrie o descriere pentru sarcină", prompt: "Ajută-mă să scriu o descriere clară și profesională pentru următoarea sarcină: " },
-  { id: "plan", label: "Plan de acțiune", prompt: "Creează un plan de acțiune pas cu pas pentru a finaliza următoarea sarcină: " },
   { id: "email", label: "Redactează un email", prompt: "Ajută-mă să redactez un email profesional pentru: " },
+  { id: "feedback", label: "Analizează feedback", prompt: "Analizează următorul feedback și sugerează cum să răspund profesionist: " },
 ];
 
 export default function Tasks() {
@@ -224,15 +224,6 @@ Răspunde în română, profesionist și concis.`;
         </div>
       )}
 
-      {/* Buton AI fix în colțul din dreapta jos */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <button onClick={() => setShowChat(true)}
-          className="flex items-center gap-2 px-4 py-3 rounded-2xl text-white font-medium text-sm shadow-lg hover:-translate-y-1 transition-all"
-          style={{ backgroundColor: "#f59e0b" }}>
-          <Sparkles className="h-5 w-5" />
-          Asistent AI
-        </button>
-      </div>
 
       {/* Modal chat asistent */}
       {showChat && (
