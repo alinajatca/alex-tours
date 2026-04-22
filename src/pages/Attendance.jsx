@@ -493,12 +493,80 @@ export default function Attendance() {
                       <div><p className="text-lg font-bold text-red-400">{zileAbsente}</p><p className="text-xs text-slate-400">Absent</p></div>
                       <div><p className="text-lg font-bold text-slate-700">{oreLucrate}</p><p className="text-xs text-slate-400">Ore lucrate</p></div>
                     </div>
-                    <button onClick={() => {}}
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-white flex-shrink-0"
-                      style={{ backgroundColor: "#00b5b5" }}>
-                      <Download className="h-3.5 w-3.5" />
-                      PDF
-                    </button>
+
+                    
+                    <button onClick={() => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.setFillColor(26, 58, 58);
+  doc.rect(0, 0, pageWidth, 40, "F");
+  doc.setFontSize(20);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.text("ALEX TOURS", 14, 18);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(0, 181, 181);
+  doc.text("Raport Pontaj Lunar", 14, 28);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`Generat: ${format(new Date(), "dd.MM.yyyy HH:mm")}`, pageWidth - 14, 28, { align: "right" });
+  doc.setFillColor(240, 250, 250);
+  doc.rect(0, 40, pageWidth, 35, "F");
+  doc.setFontSize(14);
+  doc.setTextColor(26, 58, 58);
+  doc.setFont("helvetica", "bold");
+  doc.text(emp.full_name, 14, 55);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Departament: ${emp.department || "—"}`, 14, 65);
+  doc.text(`Perioada: ${exportMonth}`, pageWidth / 2, 65, { align: "center" });
+  doc.text(`Email: ${emp.email}`, pageWidth - 14, 65, { align: "right" });
+  const col = (pageWidth - 28) / 3;
+  doc.setFillColor(0, 181, 181);
+  doc.rect(14, 85, col - 5, 30, "F");
+  doc.setFillColor(239, 68, 68);
+  doc.rect(14 + col, 85, col - 5, 30, "F");
+  doc.setFillColor(26, 58, 58);
+  doc.rect(14 + col * 2, 85, col - 5, 30, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text(`${zilePrezente}`, 14 + col / 2 - 2, 97, { align: "center" });
+  doc.text(`${zileAbsente}`, 14 + col + col / 2 - 2, 97, { align: "center" });
+  doc.text(oreLucrate, 14 + col * 2 + col / 2 - 2, 97, { align: "center" });
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text("Zile Prezente", 14 + col / 2 - 2, 108, { align: "center" });
+  doc.text("Zile Absente", 14 + col + col / 2 - 2, 108, { align: "center" });
+  doc.text("Total Ore", 14 + col * 2 + col / 2 - 2, 108, { align: "center" });
+  autoTable(doc, {
+    startY: 125,
+    head: [["Data", "Check-in", "Check-out", "Ore Lucrate", "Locație", "Status"]],
+    body: empRecords.map(r => {
+      const dayEvs = empEvents.filter(e => e.date === r.date).sort((a, b) => a.time?.localeCompare(b.time));
+      const checkOut = dayEvs.find(e => e.event_type === "check_out")?.time || "—";
+      const dayHours = calculateHours(dayEvs) || "—";
+      return [r.date || "—", r.check_in || "—", checkOut, dayHours, r.work_location || "—", r.status === "present" ? "Prezent" : "Absent"];
+    }),
+    headStyles: { fillColor: [26, 58, 58], textColor: 255, fontStyle: "bold", fontSize: 9 },
+    alternateRowStyles: { fillColor: [240, 250, 250] },
+    styles: { fontSize: 9 },
+  });
+  const finalY = doc.lastAutoTable.finalY + 10;
+  doc.setDrawColor(0, 181, 181);
+  doc.setLineWidth(0.5);
+  doc.line(14, finalY, pageWidth - 14, finalY);
+  doc.setFontSize(8);
+  doc.setTextColor(150);
+  doc.text("Document generat automat de sistemul Alex Tours Virtual Office", pageWidth / 2, finalY + 8, { align: "center" });
+  doc.save(`pontaj-${emp.full_name.replace(" ", "-")}-${exportMonth}.pdf`);
+}}
+  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-white flex-shrink-0"
+  style={{ backgroundColor: "#00b5b5" }}>
+  <Download className="h-3.5 w-3.5" />
+  PDF
+</button>
                   </div>
                 );
               })}

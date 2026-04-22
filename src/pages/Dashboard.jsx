@@ -192,8 +192,8 @@ export default function Dashboard() {
 
       {/* AI Insights */}
       {user?.isManager && (
-        <AIInsights employees={employees} tasks={tasks} attendance={attendance} events={[]} />
-      )}
+  <AIInsights employees={employees} tasks={tasks} attendance={attendance} events={[]} user={user} />
+)}
 
       {/* Sarcini */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
