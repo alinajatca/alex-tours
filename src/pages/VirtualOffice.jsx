@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { appClient } from "@/api/appClient";
-import { Users, MessageSquare, Video, CheckSquare, FolderOpen, Wifi, Bell, Plus, Trash2, X, AlertTriangle, Smile } from "lucide-react";
+import { Users, MessageSquare, Video, CheckSquare, FolderOpen, Wifi, Bell, Plus, Trash2, X, AlertTriangle, Smile, PlayCircle, CheckCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -84,6 +84,8 @@ export default function VirtualOffice() {
   const [newText, setNewText] = useState("");
   const [newUrgent, setNewUrgent] = useState(false);
   const [selectedMood, setSelectedMood] = useState(null);
+  const [checkInLoading, setCheckInLoading] = useState(false);
+  const [checkInDone, setCheckInDone] = useState(false);
 
   const todayStr = new Date().toISOString().split("T")[0];
   const weekStr = format(new Date(), "yyyy-'W'ww");
@@ -115,6 +117,25 @@ export default function VirtualOffice() {
     queryFn: () => appClient.entities.MoodVote.list(),
     refetchInterval: 30000,
   });
+
+  const { data: todayAttendance = [] } = useQuery({
+    queryKey: ["attendance-today", user?.email],
+    queryFn: () => appClient.entities.Attendance.list(50),
+    refetchInterval: 30000,
+    enabled: !isManager,
+  });
+
+  const { data: todayEvents = [] } = useQuery({
+    queryKey: ["attendance-events-today", user?.email],
+    queryFn: () => appClient.entities.AttendanceEvent.list(50),
+    refetchInterval: 30000,
+    enabled: !isManager,
+  });
+
+  const myTodayRecord = todayAttendance.find(r => r.employee_email === user?.email && r.date === todayStr);
+  const myTodayEvents = todayEvents.filter(e => e.employee_email === user?.email && e.date === todayStr);
+  const hasCheckedIn = myTodayEvents.some(e => e.event_type === "check_in");
+  const hasCheckedOut = myTodayEvents.some(e => e.event_type === "check_out");
 
   const createMutation = useMutation({
     mutationFn: (data) => appClient.entities.Announcement.create(data),
@@ -157,6 +178,42 @@ export default function VirtualOffice() {
     });
   };
 
+  const handleQuickCheckIn = async () => {
+    if (hasCheckedIn || checkInLoading) return;
+    setCheckInLoading(true);
+    try {
+      const now = format(new Date(), "HH:mm");
+      const myEmployee = employees.find(e => e.email === user?.email);
+      await appClient.entities.AttendanceEvent.create({
+        employee_email: user?.email,
+        employee_name: user?.full_name,
+        date: todayStr,
+        time: now,
+        event_type: "check_in",
+      });
+      if (!myTodayRecord) {
+        await appClient.entities.Attendance.create({
+          employee_email: user?.email,
+          employee_name: user?.full_name,
+          date: todayStr,
+          check_in: now,
+          status: "present",
+          work_location: "acasa",
+        });
+      }
+      if (myEmployee) {
+        await appClient.entities.Employee.update(myEmployee.id, { current_status: "acasa" });
+      }
+      queryClient.invalidateQueries({ queryKey: ["attendance-today"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-events-today"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      setCheckInDone(true);
+    } catch (_) {
+      // ignorat
+    }
+    setCheckInLoading(false);
+  };
+
   const activeRooms = rooms.filter(r => r.status === "in_use").length;
   const myTasks = tasks.filter(t => t.assigned_to_email === user?.email && t.status !== "done").length;
   const onlineCount = employees.filter(e => e.status === "active").length;
@@ -187,8 +244,35 @@ export default function VirtualOffice() {
               <span className="text-sm font-medium" style={{ color: "#00b5b5" }}>Birou Virtual · Online</span>
             </div>
             <h1 className="text-3xl font-bold mb-1">Bun venit{user?.full_name ? `, ${user.full_name.split(" ")[0]}` : ""}! 👋</h1>
-            <p className="text-slate-300 text-sm">Teamora — tot ce are nevoie echipa ta într-un singur loc.</p>
+            <p className="text-slate-300 text-sm">Tot ce are nevoie echipa ta într-un singur loc.</p>
+
+            {/* Buton check-in rapid - doar pentru angajați */}
+            {!isManager && (
+              <div className="mt-4">
+                {hasCheckedIn || checkInDone ? (
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium w-fit"
+                    style={{ backgroundColor: "rgba(0,181,181,0.2)", color: "#00b5b5" }}>
+                    <CheckCircle className="h-4 w-4" />
+                    Check-in înregistrat azi
+                  </div>
+                ) : hasCheckedOut ? (
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium w-fit"
+                    style={{ backgroundColor: "rgba(100,116,139,0.2)", color: "#94a3b8" }}>
+                    <CheckCircle className="h-4 w-4" />
+                    Zi de lucru încheiată
+                  </div>
+                ) : (
+                  <button onClick={handleQuickCheckIn} disabled={checkInLoading}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:-translate-y-0.5 disabled:opacity-70"
+                    style={{ backgroundColor: "#00b5b5", color: "white" }}>
+                    <PlayCircle className="h-4 w-4" />
+                    {checkInLoading ? "Se înregistrează..." : `Începe ziua — ${format(new Date(), "HH:mm")}`}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+
           <div className="flex gap-6 text-center">
             <div>
               <div className="text-2xl font-bold">{onlineCount}</div>
@@ -221,14 +305,9 @@ export default function VirtualOffice() {
         </div>
         <div className="flex flex-wrap justify-center gap-3">
           {socialLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
+            <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-white text-sm font-medium hover:opacity-90 hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
-              style={{ background: link.gradient || link.bg }}
-            >
+              style={{ background: link.gradient || link.bg }}>
               {link.icon}
               {link.label}
             </a>
@@ -255,7 +334,7 @@ export default function VirtualOffice() {
         ))}
       </div>
 
-      {/* Mood Board - vizibil tuturor */}
+      {/* Mood Board */}
       <Motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -315,8 +394,6 @@ export default function VirtualOffice() {
 
       {/* Anunțuri + Echipă Online */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Anunțuri */}
         <Motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -334,31 +411,23 @@ export default function VirtualOffice() {
               )}
             </h3>
             {isManager && (
-              <button
-                onClick={() => setShowModal(true)}
-                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors hover:opacity-90 text-white"
-                style={{ backgroundColor: '#00b5b5' }}
-              >
+              <button onClick={() => setShowModal(true)}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg text-white"
+                style={{ backgroundColor: '#00b5b5' }}>
                 <Plus className="h-3.5 w-3.5" />
                 Anunț nou
               </button>
             )}
           </div>
-
           <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
             {announcements.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-6">Niciun anunț momentan</p>
             ) : (
               announcements.map((ann) => (
-                <div
-                  key={ann.id}
-                  className="flex items-start gap-3 p-3 rounded-xl"
-                  style={{ backgroundColor: ann.urgent ? '#fff5f5' : '#f8fafc' }}
-                >
-                  <div
-                    className="mt-1.5 h-2 w-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: ann.urgent ? '#ef4444' : '#00b5b5' }}
-                  />
+                <div key={ann.id} className="flex items-start gap-3 p-3 rounded-xl"
+                  style={{ backgroundColor: ann.urgent ? '#fff5f5' : '#f8fafc' }}>
+                  <div className="mt-1.5 h-2 w-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: ann.urgent ? '#ef4444' : '#00b5b5' }} />
                   <div className="flex-1 min-w-0">
                     {ann.urgent && (
                       <div className="flex items-center gap-1 mb-1">
@@ -372,10 +441,8 @@ export default function VirtualOffice() {
                         {ann.author && `${ann.author} · `}{formatDate(ann.created_date)}
                       </span>
                       {isManager && (
-                        <button
-                          onClick={() => deleteMutation.mutate(ann.id)}
-                          className="text-slate-300 hover:text-red-400 transition-colors"
-                        >
+                        <button onClick={() => deleteMutation.mutate(ann.id)}
+                          className="text-slate-300 hover:text-red-400 transition-colors">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       )}
@@ -387,7 +454,6 @@ export default function VirtualOffice() {
           </div>
         </Motion.div>
 
-        {/* Echipă Online */}
         <Motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -419,50 +485,34 @@ export default function VirtualOffice() {
         </Motion.div>
       </div>
 
-      {/* Modal adaugă anunț */}
+      {/* Modal anunț */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <Motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
-          >
+          <Motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-slate-900">Anunț nou</h2>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <textarea
-              value={newText}
-              onChange={(e) => setNewText(e.target.value)}
-              placeholder="Scrie anunțul pentru echipă..."
-              rows={4}
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 resize-none focus:outline-none focus:ring-2 focus:ring-[#00b5b5] mb-4"
-            />
+            <textarea value={newText} onChange={(e) => setNewText(e.target.value)}
+              placeholder="Scrie anunțul pentru echipă..." rows={4}
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 resize-none focus:outline-none focus:ring-2 focus:ring-[#00b5b5] mb-4" />
             <label className="flex items-center gap-2 mb-5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={newUrgent}
-                onChange={(e) => setNewUrgent(e.target.checked)}
-                className="accent-[#ef4444] w-4 h-4"
-              />
+              <input type="checkbox" checked={newUrgent} onChange={(e) => setNewUrgent(e.target.checked)}
+                className="accent-[#ef4444] w-4 h-4" />
               <AlertTriangle className="h-4 w-4 text-red-400" />
               <span className="text-sm text-slate-600">Marchează ca urgent</span>
             </label>
             <div className="flex gap-3">
-              <button
-                onClick={() => setShowModal(false)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-              >
+              <button onClick={() => setShowModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">
                 Anulează
               </button>
-              <button
-                onClick={handleCreate}
-                disabled={!newText.trim() || createMutation.isPending}
-                className="flex-1 py-2.5 rounded-xl text-white text-sm font-medium transition-colors disabled:opacity-50"
-                style={{ backgroundColor: '#00b5b5' }}
-              >
+              <button onClick={handleCreate} disabled={!newText.trim() || createMutation.isPending}
+                className="flex-1 py-2.5 rounded-xl text-white text-sm font-medium disabled:opacity-50"
+                style={{ backgroundColor: '#00b5b5' }}>
                 {createMutation.isPending ? "Se salvează..." : "Publică anunț"}
               </button>
             </div>

@@ -2,10 +2,9 @@ import React, { useState } from "react";
 import { appClient } from "@/api/appClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion as Motion } from "framer-motion";
-import AttendanceTable from "../components/attendance/AttendanceTable";
 import { useAuth } from "@/lib/AuthContext";
 import { format } from "date-fns";
-import { CheckCircle, Clock, Coffee, LogOut, PlayCircle, MapPin, Users, Home, AlertCircle, Download, PalmtreeIcon, X, Check, CalendarDays } from "lucide-react";
+import { CheckCircle, Clock, Coffee, LogOut, PlayCircle, MapPin, Users, Home, AlertCircle, Download, X, Check, CalendarDays, TrendingUp } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -29,12 +28,15 @@ const LEAVE_TYPES = [
   { id: "concediu_fara_plata", label: "Fără plată" },
 ];
 
-function calculateHours(events) {
-  let total = 0;
-  let breakTime = 0;
-  let checkIn = null;
-  let breakStart = null;
-  events.forEach(e => {
+function timeToMinutes(t) {
+  if (!t) return null;
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function calculateHours(evs) {
+  let total = 0, breakTime = 0, checkIn = null, breakStart = null;
+  evs.forEach(e => {
     const time = e.time ? e.time.split(":").map(Number) : null;
     if (!time) return;
     const minutes = time[0] * 60 + time[1];
@@ -47,6 +49,21 @@ function calculateHours(events) {
   const h = Math.floor(total / 60);
   const m = total % 60;
   return `${h}h ${m > 0 ? m + "min" : ""}`.trim();
+}
+
+function calculateOvertimeMinutes(evs) {
+  let total = 0, breakTime = 0, checkIn = null, breakStart = null;
+  evs.forEach(e => {
+    const time = e.time ? e.time.split(":").map(Number) : null;
+    if (!time) return;
+    const minutes = time[0] * 60 + time[1];
+    if (e.event_type === "check_in") checkIn = minutes;
+    if (e.event_type === "break_start") breakStart = minutes;
+    if (e.event_type === "break_end" && breakStart) { breakTime += minutes - breakStart; breakStart = null; }
+    if (e.event_type === "check_out" && checkIn) { total = minutes - checkIn - breakTime; }
+  });
+  const overtime = total - 480;
+  return overtime > 0 ? overtime : 0;
 }
 
 export default function Attendance() {
@@ -63,7 +80,7 @@ export default function Attendance() {
     queryFn: () => appClient.entities.Employee.list(),
   });
 
-  const { data: records = [], isLoading } = useQuery({
+  const { data: records = [] } = useQuery({
     queryKey: ["attendance"],
     queryFn: () => appClient.entities.Attendance.list(500),
     refetchInterval: 30000,
@@ -71,18 +88,18 @@ export default function Attendance() {
 
   const { data: events = [] } = useQuery({
     queryKey: ["attendance-events"],
-    queryFn: () => appClient.entities.AttendanceEvent.list(100),
+    queryFn: () => appClient.entities.AttendanceEvent.list(500),
     refetchInterval: 30000,
   });
 
   const { data: leaveRequests = [] } = useQuery({
-  queryKey: ["leave-requests", user?.email, user?.isManager],
-  queryFn: () => appClient.entities.LeaveRequest.list(user?.isManager ? 200 : 50),
-  refetchInterval: 30000,
-  select: (data) => user?.isManager
-    ? data
-    : data.filter(r => r.employee_email === user?.email),
-});
+    queryKey: ["leave-requests", user?.email, user?.isManager],
+    queryFn: () => appClient.entities.LeaveRequest.list(user?.isManager ? 200 : 50),
+    refetchInterval: 30000,
+    select: (data) => user?.isManager
+      ? data
+      : data.filter(r => r.employee_email === user?.email),
+  });
 
   const createRecordMutation = useMutation({
     mutationFn: (data) => appClient.entities.Attendance.create(data),
@@ -115,19 +132,23 @@ export default function Attendance() {
 
   const myEmployee = employees.find(e => e.email === user?.email);
   const myTodayRecord = records.find(r => r.employee_email === user?.email && r.date === todayStr);
-  const myTodayEvents = events.filter(e => e.employee_email === user?.email && e.date === todayStr)
-    .sort((a, b) => a.time?.localeCompare(b.time));
+  const myTodayEvents = events
+    .filter(e => e.employee_email === user?.email && e.date === todayStr)
+    .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+
   const lastEvent = myTodayEvents[myTodayEvents.length - 1];
   const hasCheckedIn = myTodayEvents.some(e => e.event_type === "check_in");
   const hasCheckedOut = myTodayEvents.some(e => e.event_type === "check_out");
   const isOnBreak = lastEvent?.event_type === "break_start";
   const hoursWorked = calculateHours(myTodayEvents);
 
-  const myLeaveRequests = leaveRequests.filter(r => r.employee_email === user?.email)
-    .sort((a, b) => b.created_date?.localeCompare(a.created_date));
+  const myLeaveRequests = leaveRequests
+    .filter(r => r.employee_email === user?.email)
+    .sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""));
 
-  const pendingLeaves = leaveRequests.filter(r => r.status === "pending")
-    .sort((a, b) => b.created_date?.localeCompare(a.created_date));
+  const pendingLeaves = leaveRequests
+    .filter(r => r.status === "pending")
+    .sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""));
 
   const logEvent = async (eventType) => {
     const now = format(new Date(), "HH:mm");
@@ -180,8 +201,6 @@ export default function Attendance() {
     updateLeaveMutation.mutate({ id, data: { status, reviewed_by: user?.full_name, reviewed_at: new Date().toISOString() } });
   };
 
-  const filteredRecords = user?.isManager ? records : records.filter(r => r.employee_email === user?.email);
-
   const getAvailableActions = () => {
     if (!hasCheckedIn) return ["check_in"];
     if (hasCheckedOut) return [];
@@ -190,6 +209,12 @@ export default function Attendance() {
   };
 
   const availableActions = getAvailableActions();
+
+  const getLeaveStatusStyle = (status) => {
+    if (status === "approved") return { bg: "#f0fdf4", color: "#16a34a", label: "Aprobat" };
+    if (status === "rejected") return { bg: "#fef2f2", color: "#ef4444", label: "Respins" };
+    return { bg: "#fffbeb", color: "#f59e0b", label: "În așteptare" };
+  };
 
   const exportPDF = () => {
     const doc = new jsPDF();
@@ -209,12 +234,6 @@ export default function Attendance() {
       alternateRowStyles: { fillColor: [240, 250, 250] },
     });
     doc.save(`prezenta-${exportMonth}.pdf`);
-  };
-
-  const getLeaveStatusStyle = (status) => {
-    if (status === "approved") return { bg: "#f0fdf4", color: "#16a34a", label: "Aprobat" };
-    if (status === "rejected") return { bg: "#fef2f2", color: "#ef4444", label: "Respins" };
-    return { bg: "#fffbeb", color: "#f59e0b", label: "În așteptare" };
   };
 
   return (
@@ -269,6 +288,14 @@ export default function Attendance() {
             </div>
           )}
 
+          {hasCheckedIn && !hasCheckedOut && (
+            <div className="mb-3 p-3 rounded-xl text-xs flex items-center gap-2"
+              style={{ backgroundColor: "#fffbeb", color: "#f59e0b" }}>
+              <span>⏱</span>
+              <span>Programul normal e 09:00-17:00. Dacă lucrezi în continuare, orele se calculează automat ca ore suplimentare.</span>
+            </div>
+          )}
+
           {availableActions.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {availableActions.map(actionId => {
@@ -277,8 +304,8 @@ export default function Attendance() {
                 return (
                   <button key={actionId} onClick={() => logEvent(actionId)}
                     disabled={createEventMutation.isPending}
-                    className="flex items-center justify-center gap-2 py-4 rounded-xl font-semibold text-sm transition-all"
-                    style={{ backgroundColor: `${action.color}15`, color: action.color, border: `2px solid ${action.color}30` }}>
+                    className="flex items-center justify-center gap-2 py-4 rounded-xl font-semibold text-sm transition-all text-white"
+                    style={{ backgroundColor: action.color }}>
                     <action.icon className="h-5 w-5" />
                     {action.label} — {format(new Date(), "HH:mm")}
                   </button>
@@ -307,12 +334,11 @@ export default function Attendance() {
               Cererile Mele de Concediu
             </h3>
             <button onClick={() => setShowLeaveModal(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white"
               style={{ backgroundColor: "#00b5b5" }}>
               + Cerere nouă
             </button>
           </div>
-
           {myLeaveRequests.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-6">Nicio cerere de concediu înregistrată</p>
           ) : (
@@ -328,9 +354,7 @@ export default function Attendance() {
                         {req.start_date} → {req.end_date}
                         {req.reason && ` · ${req.reason}`}
                       </p>
-                      {req.reviewed_by && (
-                        <p className="text-xs text-slate-400">Revizuit de {req.reviewed_by}</p>
-                      )}
+                      {req.reviewed_by && <p className="text-xs text-slate-400">Revizuit de {req.reviewed_by}</p>}
                     </div>
                     <span className="text-xs font-semibold px-3 py-1 rounded-full flex-shrink-0"
                       style={{ backgroundColor: style.bg, color: style.color }}>
@@ -344,7 +368,7 @@ export default function Attendance() {
         </Motion.div>
       )}
 
-      {/* MANAGER - Statistici */}
+      {/* MANAGER */}
       {user?.isManager && (
         <>
           <div className="grid grid-cols-3 gap-4">
@@ -361,14 +385,11 @@ export default function Attendance() {
               <p className="text-sm text-slate-500 mt-1">Absenți Azi</p>
             </div>
             <div className="bg-white rounded-2xl border border-slate-200/60 p-5 text-center">
-              <p className="text-3xl font-bold text-amber-400">
-                {pendingLeaves.length}
-              </p>
+              <p className="text-3xl font-bold text-amber-400">{pendingLeaves.length}</p>
               <p className="text-sm text-slate-500 mt-1">Cereri în așteptare</p>
             </div>
           </div>
 
-          {/* MANAGER - Cereri concediu de aprobat */}
           {pendingLeaves.length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
               <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
@@ -389,22 +410,18 @@ export default function Attendance() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-900">{req.employee_name}</p>
-                        <p className="text-xs text-slate-500">
-                          {leaveType?.label || req.type} · {req.start_date} → {req.end_date}
-                        </p>
+                        <p className="text-xs text-slate-500">{leaveType?.label || req.type} · {req.start_date} → {req.end_date}</p>
                         {req.reason && <p className="text-xs text-slate-400 mt-0.5">"{req.reason}"</p>}
                       </div>
                       <div className="flex gap-2 flex-shrink-0">
                         <button onClick={() => handleLeaveAction(req.id, "approved")}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-white"
                           style={{ backgroundColor: "#00b5b5" }}>
-                          <Check className="h-3.5 w-3.5" />
-                          Aprobă
+                          <Check className="h-3.5 w-3.5" /> Aprobă
                         </button>
                         <button onClick={() => handleLeaveAction(req.id, "rejected")}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-white bg-red-400">
-                          <X className="h-3.5 w-3.5" />
-                          Respinge
+                          <X className="h-3.5 w-3.5" /> Respinge
                         </button>
                       </div>
                     </div>
@@ -414,7 +431,6 @@ export default function Attendance() {
             </div>
           )}
 
-          {/* MANAGER - Toate cererile */}
           {leaveRequests.filter(r => r.status !== "pending").length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
               <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
@@ -423,7 +439,7 @@ export default function Attendance() {
               </h3>
               <div className="space-y-2">
                 {leaveRequests.filter(r => r.status !== "pending")
-                  .sort((a, b) => b.created_date?.localeCompare(a.created_date))
+                  .sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""))
                   .slice(0, 10)
                   .map(req => {
                     const style = getLeaveStatusStyle(req.status);
@@ -449,7 +465,6 @@ export default function Attendance() {
             </div>
           )}
 
-          {/* Raport pontaj */}
           <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
               <h3 className="font-semibold text-slate-900">Raport Pontaj per Angajat</h3>
@@ -462,10 +477,11 @@ export default function Attendance() {
                 const empRecords = records.filter(r => r.employee_email === emp.email && r.date?.startsWith(exportMonth));
                 const zilePrezente = empRecords.filter(r => r.status === "present").length;
                 const zileAbsente = empRecords.filter(r => r.status === "absent").length;
-                let totalMinute = 0;
+                let totalMinute = 0, totalOvertimeMinute = 0;
+
                 [...new Set(empEvents.map(e => e.date))].forEach(date => {
-                  const dayEvents = empEvents.filter(e => e.date === date).sort((a, b) => a.time?.localeCompare(b.time));
-                  let checkIn = null, breakStart = null, breakTime = 0;
+                  const dayEvents = empEvents.filter(e => e.date === date).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+                  let checkIn = null, breakStart = null, breakTime = 0, dayTotal = 0;
                   dayEvents.forEach(ev => {
                     const time = ev.time ? ev.time.split(":").map(Number) : null;
                     if (!time) return;
@@ -473,100 +489,136 @@ export default function Attendance() {
                     if (ev.event_type === "check_in") checkIn = minutes;
                     if (ev.event_type === "break_start") breakStart = minutes;
                     if (ev.event_type === "break_end" && breakStart) { breakTime += minutes - breakStart; breakStart = null; }
-                    if (ev.event_type === "check_out" && checkIn) totalMinute += minutes - checkIn - breakTime;
+                    if (ev.event_type === "check_out" && checkIn) { dayTotal = minutes - checkIn - breakTime; }
                   });
+                  totalMinute += dayTotal;
+                  if (dayTotal > 480) totalOvertimeMinute += dayTotal - 480;
                 });
+
                 const oreLucrate = totalMinute > 0 ? `${Math.floor(totalMinute / 60)}h ${totalMinute % 60 > 0 ? totalMinute % 60 + "min" : ""}`.trim() : "—";
+                const oreSupl = totalOvertimeMinute > 0 ? `${Math.floor(totalOvertimeMinute / 60)}h ${totalOvertimeMinute % 60 > 0 ? totalOvertimeMinute % 60 + "min" : ""}`.trim() : null;
+                const zileSupl = [...new Set(empEvents.map(e => e.date))].filter(date => {
+                  const dayEvs = empEvents.filter(e => e.date === date);
+                  return calculateOvertimeMinutes(dayEvs) > 0;
+                }).length;
 
                 return (
-                  <div key={emp.id} className="flex items-center gap-4 p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors">
-                    <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-                      style={{ backgroundColor: "#00b5b5" }}>
-                      {emp.full_name?.charAt(0).toUpperCase()}
+                  <div key={emp.id} className="rounded-xl border border-slate-100 hover:border-slate-200 transition-colors overflow-hidden">
+                    <div className="flex items-center gap-4 p-4">
+                      <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                        style={{ backgroundColor: "#00b5b5" }}>
+                        {emp.full_name?.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-900 text-sm">{emp.full_name}</p>
+                        <p className="text-xs text-slate-400">{emp.department}</p>
+                      </div>
+                      <div className="flex items-center gap-4 text-center">
+                        <div><p className="text-lg font-bold" style={{ color: "#00b5b5" }}>{zilePrezente}</p><p className="text-xs text-slate-400">Prezent</p></div>
+                        <div><p className="text-lg font-bold text-red-400">{zileAbsente}</p><p className="text-xs text-slate-400">Absent</p></div>
+                        <div><p className="text-lg font-bold text-slate-700">{oreLucrate}</p><p className="text-xs text-slate-400">Ore lucrate</p></div>
+                        {oreSupl && (
+                          <div className="px-3 py-1 rounded-xl" style={{ backgroundColor: "#fffbeb" }}>
+                            <p className="text-sm font-bold" style={{ color: "#f59e0b" }}>{oreSupl}</p>
+                            <p className="text-xs" style={{ color: "#f59e0b" }}>Ore supl. ({zileSupl}z)</p>
+                          </div>
+                        )}
+                      </div>
+                      <button onClick={() => {
+                        const doc = new jsPDF();
+                        const pageWidth = doc.internal.pageSize.getWidth();
+                        doc.setFillColor(26, 58, 58);
+                        doc.rect(0, 0, pageWidth, 40, "F");
+                        doc.setFontSize(20);
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFont("helvetica", "bold");
+                        doc.text("ALEX TOURS", 14, 18);
+                        doc.setFontSize(11);
+                        doc.setFont("helvetica", "normal");
+                        doc.setTextColor(0, 181, 181);
+                        doc.text("Raport Pontaj Lunar", 14, 28);
+                        doc.setTextColor(255, 255, 255);
+                        doc.text(`Generat: ${format(new Date(), "dd.MM.yyyy HH:mm")}`, pageWidth - 14, 28, { align: "right" });
+                        doc.setFillColor(240, 250, 250);
+                        doc.rect(0, 40, pageWidth, 35, "F");
+                        doc.setFontSize(14);
+                        doc.setTextColor(26, 58, 58);
+                        doc.setFont("helvetica", "bold");
+                        doc.text(emp.full_name, 14, 55);
+                        doc.setFontSize(10);
+                        doc.setFont("helvetica", "normal");
+                        doc.setTextColor(100, 116, 139);
+                        doc.text(`Departament: ${emp.department || "—"}`, 14, 65);
+                        doc.text(`Perioada: ${exportMonth}`, pageWidth / 2, 65, { align: "center" });
+                        doc.text(`Email: ${emp.email}`, pageWidth - 14, 65, { align: "right" });
+                        const col = (pageWidth - 28) / 4;
+                        doc.setFillColor(0, 181, 181);
+                        doc.rect(14, 85, col - 4, 30, "F");
+                        doc.setFillColor(239, 68, 68);
+                        doc.rect(14 + col, 85, col - 4, 30, "F");
+                        doc.setFillColor(26, 58, 58);
+                        doc.rect(14 + col * 2, 85, col - 4, 30, "F");
+                        doc.setFillColor(245, 158, 11);
+                        doc.rect(14 + col * 3, 85, col - 4, 30, "F");
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFont("helvetica", "bold");
+                        doc.setFontSize(16);
+                        doc.text(`${zilePrezente}`, 14 + col / 2, 97, { align: "center" });
+                        doc.text(`${zileAbsente}`, 14 + col + col / 2, 97, { align: "center" });
+                        doc.text(oreLucrate, 14 + col * 2 + col / 2, 97, { align: "center" });
+                        doc.text(oreSupl || "0h", 14 + col * 3 + col / 2, 97, { align: "center" });
+                        doc.setFontSize(8);
+                        doc.setFont("helvetica", "normal");
+                        doc.text("Zile Prezente", 14 + col / 2, 108, { align: "center" });
+                        doc.text("Zile Absente", 14 + col + col / 2, 108, { align: "center" });
+                        doc.text("Total Ore", 14 + col * 2 + col / 2, 108, { align: "center" });
+                        doc.text("Ore Suplimentare", 14 + col * 3 + col / 2, 108, { align: "center" });
+                        if (oreSupl) {
+                          doc.setFontSize(9);
+                          doc.setTextColor(245, 158, 11);
+                          doc.text(`Spor ore suplimentare: ${zileSupl} zile cu peste 8h lucrate`, 14, 120);
+                          doc.setTextColor(100, 116, 139);
+                          doc.text("Conform art. 123 Codul Muncii - salariatii au dreptul la spor de minimum 75%", 14, 127);
+                          doc.text("din salariul de baza pentru primele 2 ore suplimentare si 100% pentru urmatoarele.", 14, 134);
+                        }
+                        autoTable(doc, {
+                          startY: oreSupl ? 142 : 125,
+                          head: [["Data", "Check-in", "Check-out", "Ore Lucrate", "Ore Supl.", "Locație", "Status"]],
+                          body: empRecords.map(r => {
+                            const dayEvs = empEvents.filter(e => e.date === r.date).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+                            const checkOut = dayEvs.find(e => e.event_type === "check_out")?.time || "—";
+                            const dayHours = calculateHours(dayEvs) || "—";
+                            const dayOT = calculateOvertimeMinutes(dayEvs);
+                            const dayOTStr = dayOT > 0 ? `${Math.floor(dayOT / 60)}h ${dayOT % 60 > 0 ? dayOT % 60 + "min" : ""}`.trim() : "—";
+                            return [r.date || "—", r.check_in || "—", checkOut, dayHours, dayOTStr, r.work_location || "—", r.status === "present" ? "Prezent" : "Absent"];
+                          }),
+                          headStyles: { fillColor: [26, 58, 58], textColor: 255, fontStyle: "bold", fontSize: 9 },
+                          alternateRowStyles: { fillColor: [240, 250, 250] },
+                          styles: { fontSize: 9 },
+                        });
+                        const finalY = doc.lastAutoTable.finalY + 10;
+                        doc.setDrawColor(0, 181, 181);
+                        doc.setLineWidth(0.5);
+                        doc.line(14, finalY, pageWidth - 14, finalY);
+                        doc.setFontSize(8);
+                        doc.setTextColor(150);
+                        doc.text("Document generat automat de sistemul Alex Tours Virtual Office", pageWidth / 2, finalY + 8, { align: "center" });
+                        doc.save(`pontaj-${emp.full_name.replace(" ", "-")}-${exportMonth}.pdf`);
+                      }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-white flex-shrink-0"
+                        style={{ backgroundColor: "#00b5b5" }}>
+                        <Download className="h-3.5 w-3.5" />
+                        PDF
+                      </button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-900 text-sm">{emp.full_name}</p>
-                      <p className="text-xs text-slate-400">{emp.department}</p>
-                    </div>
-                    <div className="flex items-center gap-6 text-center">
-                      <div><p className="text-lg font-bold" style={{ color: "#00b5b5" }}>{zilePrezente}</p><p className="text-xs text-slate-400">Prezent</p></div>
-                      <div><p className="text-lg font-bold text-red-400">{zileAbsente}</p><p className="text-xs text-slate-400">Absent</p></div>
-                      <div><p className="text-lg font-bold text-slate-700">{oreLucrate}</p><p className="text-xs text-slate-400">Ore lucrate</p></div>
-                    </div>
-
-                    
-                    <button onClick={() => {
-  const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  doc.setFillColor(26, 58, 58);
-  doc.rect(0, 0, pageWidth, 40, "F");
-  doc.setFontSize(20);
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.text("ALEX TOURS", 14, 18);
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(0, 181, 181);
-  doc.text("Raport Pontaj Lunar", 14, 28);
-  doc.setTextColor(255, 255, 255);
-  doc.text(`Generat: ${format(new Date(), "dd.MM.yyyy HH:mm")}`, pageWidth - 14, 28, { align: "right" });
-  doc.setFillColor(240, 250, 250);
-  doc.rect(0, 40, pageWidth, 35, "F");
-  doc.setFontSize(14);
-  doc.setTextColor(26, 58, 58);
-  doc.setFont("helvetica", "bold");
-  doc.text(emp.full_name, 14, 55);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(100, 116, 139);
-  doc.text(`Departament: ${emp.department || "—"}`, 14, 65);
-  doc.text(`Perioada: ${exportMonth}`, pageWidth / 2, 65, { align: "center" });
-  doc.text(`Email: ${emp.email}`, pageWidth - 14, 65, { align: "right" });
-  const col = (pageWidth - 28) / 3;
-  doc.setFillColor(0, 181, 181);
-  doc.rect(14, 85, col - 5, 30, "F");
-  doc.setFillColor(239, 68, 68);
-  doc.rect(14 + col, 85, col - 5, 30, "F");
-  doc.setFillColor(26, 58, 58);
-  doc.rect(14 + col * 2, 85, col - 5, 30, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text(`${zilePrezente}`, 14 + col / 2 - 2, 97, { align: "center" });
-  doc.text(`${zileAbsente}`, 14 + col + col / 2 - 2, 97, { align: "center" });
-  doc.text(oreLucrate, 14 + col * 2 + col / 2 - 2, 97, { align: "center" });
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text("Zile Prezente", 14 + col / 2 - 2, 108, { align: "center" });
-  doc.text("Zile Absente", 14 + col + col / 2 - 2, 108, { align: "center" });
-  doc.text("Total Ore", 14 + col * 2 + col / 2 - 2, 108, { align: "center" });
-  autoTable(doc, {
-    startY: 125,
-    head: [["Data", "Check-in", "Check-out", "Ore Lucrate", "Locație", "Status"]],
-    body: empRecords.map(r => {
-      const dayEvs = empEvents.filter(e => e.date === r.date).sort((a, b) => a.time?.localeCompare(b.time));
-      const checkOut = dayEvs.find(e => e.event_type === "check_out")?.time || "—";
-      const dayHours = calculateHours(dayEvs) || "—";
-      return [r.date || "—", r.check_in || "—", checkOut, dayHours, r.work_location || "—", r.status === "present" ? "Prezent" : "Absent"];
-    }),
-    headStyles: { fillColor: [26, 58, 58], textColor: 255, fontStyle: "bold", fontSize: 9 },
-    alternateRowStyles: { fillColor: [240, 250, 250] },
-    styles: { fontSize: 9 },
-  });
-  const finalY = doc.lastAutoTable.finalY + 10;
-  doc.setDrawColor(0, 181, 181);
-  doc.setLineWidth(0.5);
-  doc.line(14, finalY, pageWidth - 14, finalY);
-  doc.setFontSize(8);
-  doc.setTextColor(150);
-  doc.text("Document generat automat de sistemul Alex Tours Virtual Office", pageWidth / 2, finalY + 8, { align: "center" });
-  doc.save(`pontaj-${emp.full_name.replace(" ", "-")}-${exportMonth}.pdf`);
-}}
-  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-white flex-shrink-0"
-  style={{ backgroundColor: "#00b5b5" }}>
-  <Download className="h-3.5 w-3.5" />
-  PDF
-</button>
+                    {oreSupl && (
+                      <div className="px-4 pb-3 flex items-center gap-2">
+                        <TrendingUp className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#f59e0b" }} />
+                        <p className="text-xs" style={{ color: "#f59e0b" }}>
+                          Spor ore suplimentare aplicabil — {zileSupl} {zileSupl === 1 ? "zi" : "zile"} cu peste 8h lucrate în {exportMonth}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -593,12 +645,6 @@ export default function Attendance() {
         </>
       )}
 
-      {isLoading ? (
-        <div className="bg-white rounded-2xl border border-slate-200/60 p-12 animate-pulse h-48" />
-      ) : (
-        <AttendanceTable records={filteredRecords} />
-      )}
-
       {/* MODAL cerere concediu */}
       {showLeaveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -610,7 +656,6 @@ export default function Attendance() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-medium text-slate-600 mb-1.5 block">Tip concediu</label>
@@ -619,7 +664,6 @@ export default function Attendance() {
                   {LEAVE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
                 </select>
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1.5 block">Data început</label>
@@ -632,16 +676,13 @@ export default function Attendance() {
                     className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00b5b5]" />
                 </div>
               </div>
-
               <div>
                 <label className="text-xs font-medium text-slate-600 mb-1.5 block">Motiv (opțional)</label>
                 <textarea value={leaveForm.reason} onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })}
-                  placeholder="Descrie pe scurt motivul..."
-                  rows={3}
+                  placeholder="Descrie pe scurt motivul..." rows={3}
                   className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#00b5b5]" />
               </div>
             </div>
-
             <div className="flex gap-3 mt-5">
               <button onClick={() => setShowLeaveModal(false)}
                 className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">
