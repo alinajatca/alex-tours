@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React from "react";
 import { appClient } from "@/api/appClient";
 import { useQuery } from "@tanstack/react-query";
 import { Users, BarChart3, Clock, CalendarCheck, CheckSquare, TrendingUp, AlertTriangle, Gift, TrendingDown, Target, Activity } from "lucide-react";
 import StatCard from "../components/dashboard/StatCard";
-import { seedDatabase, seedMissing } from "@/lib/seedData";
 import AIInsights from "../components/dashboard/AIInsights";
 import { useAuth } from "@/lib/AuthContext";
 import { format } from "date-fns";
@@ -38,13 +37,23 @@ const HEATMAP_HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 const HEATMAP_DAYS = ["Lun", "Mar", "Mie", "Joi", "Vin"];
 const HEATMAP_COLORS = ["#f0fafa", "#9fe1cb", "#5dcaa5", "#1d9e75", "#0f6e56"];
 
-export default function Dashboard() {
-  const [seeding, setSeeding] = useState(false);
-  const [seeded, setSeeded] = useState(false);
-  const { user } = useAuth();
+function calcWorkingDays(yearMonth) {
+  const [year, month] = yearMonth.split("-").map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  let workingDays = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const day = new Date(year, month - 1, d).getDay();
+    if (day !== 0 && day !== 6) workingDays++;
+  }
+  return workingDays;
+}
 
+export default function Dashboard() {
+  const { user } = useAuth();
   const todayStr = new Date().toISOString().split("T")[0];
   const today = new Date();
+  const monthStr = today.toISOString().slice(0, 7);
+  const workingDaysInMonth = calcWorkingDays(monthStr);
 
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
@@ -53,7 +62,12 @@ export default function Dashboard() {
 
   const { data: attendance = [] } = useQuery({
     queryKey: ["attendance"],
-    queryFn: () => appClient.entities.Attendance.list(200),
+    queryFn: () => appClient.entities.Attendance.list(2000),
+  });
+
+  const { data: attendanceEvents = [] } = useQuery({
+    queryKey: ["attendance-events"],
+    queryFn: () => appClient.entities.AttendanceEvent.list(5000),
   });
 
   const { data: tasks = [] } = useQuery({
@@ -86,19 +100,24 @@ export default function Dashboard() {
   const absenteeismData = employeesWithScore.map(emp => {
     const empAtt = attendance.filter(a => a.employee_email === emp.email);
     const absent = empAtt.filter(a => a.status === "absent").length;
-    const total = empAtt.length;
+    const present = empAtt.filter(a => a.status === "present").length;
+    const total = absent + present;
     const rate = total > 0 ? Math.round((absent / total) * 100) : 0;
     return { ...emp, absentRate: rate, absentDays: absent, totalDays: total };
   }).sort((a, b) => b.absentRate - a.absentRate);
 
   const overtimeData = employeesWithScore.map(emp => {
-    const empAtt = attendance.filter(a => a.employee_email === emp.email && a.status === "present");
+    const empEvents = attendanceEvents.filter(e => e.employee_email === emp.email);
+    const dates = [...new Set(empEvents.map(e => e.date))];
     let overtimeDays = 0;
-    empAtt.forEach(a => {
-      if (a.check_in && a.check_out) {
-        const inMin = timeToMinutes(a.check_in);
-        const outMin = timeToMinutes(a.check_out);
-        if (outMin && inMin && (outMin - inMin) > 480) overtimeDays++;
+    dates.forEach(date => {
+      const dayEvs = empEvents.filter(e => e.date === date);
+      const checkIn = dayEvs.find(e => e.event_type === "check_in");
+      const checkOut = dayEvs.find(e => e.event_type === "check_out");
+      if (checkIn && checkOut) {
+        const inMin = timeToMinutes(checkIn.time);
+        const outMin = timeToMinutes(checkOut.time);
+        if (inMin && outMin && (outMin - inMin) > 480) overtimeDays++;
       }
     });
     return { ...emp, overtimeDays };
@@ -111,15 +130,20 @@ export default function Dashboard() {
   const burnoutData = employeesWithScore.map(emp => {
     const empAtt = attendance.filter(a => a.employee_email === emp.email);
     const absent = empAtt.filter(a => a.status === "absent").length;
-    const total = empAtt.length;
+    const present = empAtt.filter(a => a.status === "present").length;
+    const total = absent + present;
     const absentRate = total > 0 ? (absent / total) * 100 : 0;
-    const empOvertimeAtt = empAtt.filter(a => a.status === "present");
+    const empEvents = attendanceEvents.filter(e => e.employee_email === emp.email);
+    const dates = [...new Set(empEvents.map(e => e.date))];
     let overtimeDays = 0;
-    empOvertimeAtt.forEach(a => {
-      if (a.check_in && a.check_out) {
-        const inMin = timeToMinutes(a.check_in);
-        const outMin = timeToMinutes(a.check_out);
-        if (outMin && inMin && (outMin - inMin) > 480) overtimeDays++;
+    dates.forEach(date => {
+      const dayEvs = empEvents.filter(e => e.date === date);
+      const checkIn = dayEvs.find(e => e.event_type === "check_in");
+      const checkOut = dayEvs.find(e => e.event_type === "check_out");
+      if (checkIn && checkOut) {
+        const inMin = timeToMinutes(checkIn.time);
+        const outMin = timeToMinutes(checkOut.time);
+        if (inMin && outMin && (outMin - inMin) > 480) overtimeDays++;
       }
     });
     const overtimeScore = Math.min((overtimeDays / Math.max(total, 1)) * 100 * 2, 100);
@@ -163,39 +187,17 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
 
-      {!seeded && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-amber-800 text-sm">Date Demo</p>
-            <p className="text-xs text-amber-600">Populează baza de date cu date de demonstrație</p>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={async () => { setSeeding(true); await seedDatabase(); setSeeding(false); setSeeded(true); }}
-              disabled={seeding} className="px-4 py-2 rounded-xl text-sm font-medium text-white" style={{ backgroundColor: "#f59e0b" }}>
-              {seeding ? "Se încarcă..." : "Populează Tot"}
-            </button>
-            <button onClick={async () => { setSeeding(true); await seedMissing(); setSeeding(false); setSeeded(true); }}
-              disabled={seeding} className="px-4 py-2 rounded-xl text-sm font-medium text-white" style={{ backgroundColor: "#00b5b5" }}>
-              {seeding ? "Se încarcă..." : "Adaugă Date Lipsă"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard title="Angajați Activi" value={activeCount} subtitle={`${employees.length} total`} icon={Users} color="blue" delay={0} />
         <StatCard title="Productivitate Medie" value={`${avgProductivity}%`} subtitle="Prezență + Punctualitate + Sarcini" icon={BarChart3} color="green" delay={0.1} />
         <StatCard title="Prezenți Azi" value={presentToday} subtitle={`din ${activeCount} activi`} icon={CalendarCheck} color="orange" delay={0.2} />
-        <StatCard title="Sarcini Finalizate" value={`${tasksDone}/${tasksTotal}`} subtitle={`${tasksTotal > 0 ? Math.round((tasksDone/tasksTotal)*100) : 0}% din total`} icon={CheckSquare} color="purple" delay={0.3} />
+        <StatCard title="Sarcini Finalizate" value={`${tasksDone}/${tasksTotal}`} subtitle={`${tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : 0}% din total`} icon={CheckSquare} color="purple" delay={0.3} />
       </div>
 
-      {/* AI Insights */}
       {user?.isManager && (
-  <AIInsights employees={employees} tasks={tasks} attendance={attendance} events={[]} user={user} />
-)}
+        <AIInsights employees={employees} tasks={tasks} attendance={attendance} events={[]} user={user} />
+      )}
 
-      {/* Sarcini */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl border border-slate-200/60 p-5">
           <div className="flex items-center gap-3 mb-3">
@@ -232,7 +234,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Heatmap activitate */}
       <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
         <h3 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
           <Activity className="h-4 w-4" style={{ color: "#00b5b5" }} /> Activitate Echipă pe Ore
@@ -249,7 +250,7 @@ export default function Dashboard() {
                 <div style={{ fontSize: "11px", color: "#94a3b8", display: "flex", alignItems: "center" }}>{day}</div>
                 {HEATMAP_HOURS.map((h, hi) => {
                   const val = heatmapData[di]?.[hi] || 0;
-                  const maxVal = 11;
+                  const maxVal = 16;
                   const ci = val === 0 ? 0 : Math.min(Math.ceil((val / maxVal) * 4), 4);
                   return (
                     <div key={h} title={`${day} ${h}:00 — ${val} angajați`}
@@ -271,7 +272,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Timeline azi */}
       <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
         <h3 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
           <Clock className="h-4 w-4" style={{ color: "#00b5b5" }} /> Activitate Azi — {format(new Date(), "d MMMM yyyy")}
@@ -303,7 +303,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Top Angajati + Absenteism */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {topEmployees.length > 0 && (
           <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
@@ -337,6 +336,7 @@ export default function Dashboard() {
           <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
             <TrendingDown className="h-4 w-4 text-red-400" /> Rata de Absenteism
           </h3>
+          <p className="text-xs text-slate-400 mb-3">Zile absente din total zile lucrătoare înregistrate</p>
           <div className="space-y-3">
             {absenteeismData.slice(0, 5).map(emp => (
               <div key={emp.id} className="flex items-center gap-3">
@@ -354,7 +354,7 @@ export default function Dashboard() {
                   <div className="w-full bg-slate-100 rounded-full h-1.5">
                     <div className="h-1.5 rounded-full" style={{ width: `${emp.absentRate}%`, backgroundColor: emp.absentRate > 20 ? "#ef4444" : emp.absentRate > 10 ? "#f59e0b" : "#00b5b5" }} />
                   </div>
-                  <p className="text-xs text-slate-400">{emp.absentDays} zile absente din {emp.totalDays}</p>
+                  <p className="text-xs text-slate-400">{emp.absentDays} zile absente din {emp.totalDays} înregistrate</p>
                 </div>
               </div>
             ))}
@@ -362,7 +362,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Burnout Risk + Ore Suplimentare */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
           <h3 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
@@ -401,6 +400,7 @@ export default function Dashboard() {
           <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
             <Clock className="h-4 w-4 text-amber-500" /> Ore Suplimentare
           </h3>
+          <p className="text-xs text-slate-400 mb-3">Angajați cu zile de lucru peste 8 ore</p>
           {overtimeData.length === 0 ? (
             <p className="text-sm text-slate-400">Nicio oră suplimentară înregistrată</p>
           ) : (
@@ -425,7 +425,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Zile de nastere */}
       <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
         <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
           <Gift className="h-4 w-4 text-pink-400" /> Zile de Naștere Luna Aceasta
@@ -445,7 +444,6 @@ export default function Dashboard() {
             ))}
           </div>
         )}
-        <p className="text-xs text-slate-400 mt-3">* Adaugă data nașterii în profilul angajatului</p>
       </div>
 
     </div>

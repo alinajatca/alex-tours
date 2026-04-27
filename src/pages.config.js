@@ -10,6 +10,7 @@ import VirtualOffice from './pages/VirtualOffice';
 import __Layout from './Layout.jsx';
 import Calendar from "./pages/Calendar";
 import Clients from "./pages/Clients";
+import SeedPage from './pages/SeedPage';
 
 export const PAGES = {
     "Dashboard": Dashboard,
@@ -23,6 +24,7 @@ export const PAGES = {
     "Files": Files,
     "Calendar": Calendar,
     "Clients": Clients,
+    "Seed": SeedPage,
 }
 
 export const pagesConfig = {
