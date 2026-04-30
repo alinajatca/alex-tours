@@ -1,11 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { appClient } from "@/api/appClient";
 import { useQuery } from "@tanstack/react-query";
-import { Users, BarChart3, Clock, CalendarCheck, CheckSquare, TrendingUp, AlertTriangle, Gift, TrendingDown, Target, Activity } from "lucide-react";
+import { Users, BarChart3, Clock, CalendarCheck, CheckSquare, TrendingUp, AlertTriangle, Gift, TrendingDown, Target, Activity, ChevronLeft, ChevronRight } from "lucide-react";
 import StatCard from "../components/dashboard/StatCard";
 import AIInsights from "../components/dashboard/AIInsights";
 import { useAuth } from "@/lib/AuthContext";
 import { format } from "date-fns";
+import { ro } from "date-fns/locale";
 
 function timeToMinutes(t) {
   if (!t) return null;
@@ -48,12 +49,29 @@ function calcWorkingDays(yearMonth) {
   return workingDays;
 }
 
+function getMonthStr(date) {
+  return date.toISOString().slice(0, 7);
+}
+
+function navigateMonth(monthStr, direction) {
+  const [year, month] = monthStr.split("-").map(Number);
+  const d = new Date(year, month - 1 + direction, 1);
+  return getMonthStr(d);
+}
+
+function formatMonthLabel(monthStr) {
+  const [year, month] = monthStr.split("-").map(Number);
+  const d = new Date(year, month - 1, 1);
+  return format(d, "MMMM yyyy", { locale: ro });
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const todayStr = new Date().toISOString().split("T")[0];
   const today = new Date();
-  const monthStr = today.toISOString().slice(0, 7);
-  const workingDaysInMonth = calcWorkingDays(monthStr);
+  const currentMonthStr = getMonthStr(today);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
+  const isCurrentMonth = selectedMonth === currentMonthStr;
 
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
@@ -77,9 +95,13 @@ export default function Dashboard() {
 
   const activeCount = employees.filter(e => e.status === "active").length;
 
+  // Filtrare date pe luna selectata
+  const monthAttendance = attendance.filter(a => a.date && a.date.startsWith(selectedMonth));
+  const monthEvents = attendanceEvents.filter(e => e.date && e.date.startsWith(selectedMonth));
+
   const employeesWithScore = employees.map(emp => ({
     ...emp,
-    computed_score: calcProductivityScore(emp, attendance, tasks),
+    computed_score: calcProductivityScore(emp, monthAttendance, tasks),
   }));
 
   const avgProductivity = employeesWithScore.length > 0
@@ -98,7 +120,7 @@ export default function Dashboard() {
   });
 
   const absenteeismData = employeesWithScore.map(emp => {
-    const empAtt = attendance.filter(a => a.employee_email === emp.email);
+    const empAtt = monthAttendance.filter(a => a.employee_email === emp.email);
     const absent = empAtt.filter(a => a.status === "absent").length;
     const present = empAtt.filter(a => a.status === "present").length;
     const total = absent + present;
@@ -106,34 +128,43 @@ export default function Dashboard() {
     return { ...emp, absentRate: rate, absentDays: absent, totalDays: total };
   }).sort((a, b) => b.absentRate - a.absentRate);
 
-  const overtimeData = employeesWithScore.map(emp => {
-    const empEvents = attendanceEvents.filter(e => e.employee_email === emp.email);
-    const dates = [...new Set(empEvents.map(e => e.date))];
-    let overtimeDays = 0;
-    dates.forEach(date => {
-      const dayEvs = empEvents.filter(e => e.date === date);
-      const checkIn = dayEvs.find(e => e.event_type === "check_in");
-      const checkOut = dayEvs.find(e => e.event_type === "check_out");
-      if (checkIn && checkOut) {
-        const inMin = timeToMinutes(checkIn.time);
-        const outMin = timeToMinutes(checkOut.time);
-        if (inMin && outMin && (outMin - inMin) > 480) overtimeDays++;
+ const overtimeData = employeesWithScore.map(emp => {
+  const empEvents = monthEvents.filter(e => e.employee_email === emp.email);
+  const dates = [...new Set(empEvents.map(e => e.date))];
+  let overtimeMinutes = 0;
+  let overtimeDays = 0;
+  dates.forEach(date => {
+    const dayEvs = empEvents.filter(e => e.date === date);
+    const checkIn = dayEvs.find(e => e.event_type === "check_in");
+    const checkOut = dayEvs.find(e => e.event_type === "check_out");
+    if (checkIn && checkOut) {
+      const inMin = timeToMinutes(checkIn.time);
+      const outMin = timeToMinutes(checkOut.time);
+      if (inMin && outMin && (outMin - inMin) > 480) {
+        overtimeMinutes += (outMin - inMin) - 480;
+        overtimeDays++;
       }
-    });
-    return { ...emp, overtimeDays };
-  }).filter(e => e.overtimeDays > 0).sort((a, b) => b.overtimeDays - a.overtimeDays);
+    }
+  });
+  const overtimeHours = Math.floor(overtimeMinutes / 60);
+  const overtimeMins = overtimeMinutes % 60;
+  const overtimeStr = overtimeMinutes > 0
+    ? `${overtimeHours}h${overtimeMins > 0 ? ` ${overtimeMins}min` : ""}`
+    : null;
+  return { ...emp, overtimeMinutes, overtimeDays, overtimeStr };
+}).filter(e => e.overtimeMinutes > 0).sort((a, b) => b.overtimeMinutes - a.overtimeMinutes);
 
   const topEmployees = [...employeesWithScore]
     .sort((a, b) => b.computed_score - a.computed_score)
     .slice(0, 5);
 
   const burnoutData = employeesWithScore.map(emp => {
-    const empAtt = attendance.filter(a => a.employee_email === emp.email);
+    const empAtt = monthAttendance.filter(a => a.employee_email === emp.email);
     const absent = empAtt.filter(a => a.status === "absent").length;
     const present = empAtt.filter(a => a.status === "present").length;
     const total = absent + present;
     const absentRate = total > 0 ? (absent / total) * 100 : 0;
-    const empEvents = attendanceEvents.filter(e => e.employee_email === emp.email);
+    const empEvents = monthEvents.filter(e => e.employee_email === emp.email);
     const dates = [...new Set(empEvents.map(e => e.date))];
     let overtimeDays = 0;
     dates.forEach(date => {
@@ -181,11 +212,46 @@ export default function Dashboard() {
   const birthdaysThisMonth = employees.filter(emp => {
     if (!emp.birth_date) return false;
     const bday = new Date(emp.birth_date);
-    return bday.getMonth() === today.getMonth();
+    const [selYear, selMonth] = selectedMonth.split("-").map(Number);
+    return bday.getMonth() === selMonth - 1;
   });
+
+  // Statistici luna selectata
+  const monthPresentDays = monthAttendance.filter(a => a.status === "present").length;
+  const monthAbsentDays = monthAttendance.filter(a => a.status === "absent").length;
+  const workingDays = calcWorkingDays(selectedMonth);
 
   return (
     <div className="space-y-8">
+
+      {/* Selector luna - doar pentru manager */}
+      {user?.isManager && (
+        <div className="bg-white rounded-2xl border border-slate-200/60 p-4 flex items-center justify-between">
+          <button
+            onClick={() => setSelectedMonth(m => navigateMonth(m, -1))}
+            className="h-9 w-9 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors">
+            <ChevronLeft className="h-4 w-4 text-slate-600" />
+          </button>
+          <div className="text-center">
+            <p className="font-semibold text-slate-900 capitalize">{formatMonthLabel(selectedMonth)}</p>
+            {!isCurrentMonth && (
+              <button onClick={() => setSelectedMonth(currentMonthStr)}
+                className="text-xs mt-0.5" style={{ color: "#00b5b5" }}>
+                Înapoi la luna curentă
+              </button>
+            )}
+            {isCurrentMonth && (
+              <p className="text-xs text-slate-400 mt-0.5">Luna curentă</p>
+            )}
+          </div>
+          <button
+            onClick={() => setSelectedMonth(m => navigateMonth(m, 1))}
+            disabled={selectedMonth >= "2026-08"}
+            className="h-9 w-9 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+            <ChevronRight className="h-4 w-4 text-slate-600" />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard title="Angajați Activi" value={activeCount} subtitle={`${employees.length} total`} icon={Users} color="blue" delay={0} />
@@ -194,8 +260,10 @@ export default function Dashboard() {
         <StatCard title="Sarcini Finalizate" value={`${tasksDone}/${tasksTotal}`} subtitle={`${tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : 0}% din total`} icon={CheckSquare} color="purple" delay={0.3} />
       </div>
 
+      
+
       {user?.isManager && (
-        <AIInsights employees={employees} tasks={tasks} attendance={attendance} events={[]} user={user} />
+        <AIInsights employees={employees} tasks={tasks} attendance={monthAttendance} events={[]} user={user} />
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -274,7 +342,7 @@ export default function Dashboard() {
 
       <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
         <h3 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
-          <Clock className="h-4 w-4" style={{ color: "#00b5b5" }} /> Activitate Azi — {format(new Date(), "d MMMM yyyy")}
+          <Clock className="h-4 w-4" style={{ color: "#00b5b5" }} /> Activitate Azi — {format(new Date(), "d MMMM yyyy", { locale: ro })}
         </h3>
         <p className="text-xs text-slate-400 mb-4">Check-in-urile echipei în timp real</p>
         {todayEvents.length === 0 ? (
@@ -307,7 +375,7 @@ export default function Dashboard() {
         {topEmployees.length > 0 && (
           <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
             <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <Target className="h-4 w-4" style={{ color: "#00b5b5" }} /> Top Angajați după Productivitate
+              <Target className="h-4 w-4" style={{ color: "#00b5b5" }} /> Top Angajați — {formatMonthLabel(selectedMonth)}
             </h3>
             <div className="space-y-3">
               {topEmployees.map((emp, i) => (
@@ -334,9 +402,9 @@ export default function Dashboard() {
 
         <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
           <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <TrendingDown className="h-4 w-4 text-red-400" /> Rata de Absenteism
+            <TrendingDown className="h-4 w-4 text-red-400" /> Rata de Absenteism — {formatMonthLabel(selectedMonth)}
           </h3>
-          <p className="text-xs text-slate-400 mb-3">Zile absente din total zile lucrătoare înregistrate</p>
+          <p className="text-xs text-slate-400 mb-3">Zile absente din total zile înregistrate</p>
           <div className="space-y-3">
             {absenteeismData.slice(0, 5).map(emp => (
               <div key={emp.id} className="flex items-center gap-3">
@@ -354,7 +422,7 @@ export default function Dashboard() {
                   <div className="w-full bg-slate-100 rounded-full h-1.5">
                     <div className="h-1.5 rounded-full" style={{ width: `${emp.absentRate}%`, backgroundColor: emp.absentRate > 20 ? "#ef4444" : emp.absentRate > 10 ? "#f59e0b" : "#00b5b5" }} />
                   </div>
-                  <p className="text-xs text-slate-400">{emp.absentDays} zile absente din {emp.totalDays} înregistrate</p>
+                  <p className="text-xs text-slate-400">{emp.absentDays} absente din {emp.totalDays} înregistrate</p>
                 </div>
               </div>
             ))}
@@ -365,7 +433,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
           <h3 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" /> Risc Burnout
+            <AlertTriangle className="h-4 w-4 text-amber-500" /> Risc Burnout — {formatMonthLabel(selectedMonth)}
           </h3>
           <p className="text-xs text-slate-400 mb-4">Calculat din absențe + ore suplimentare + sarcini restante</p>
           <div className="space-y-3">
@@ -398,7 +466,7 @@ export default function Dashboard() {
 
         <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
           <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-amber-500" /> Ore Suplimentare
+            <Clock className="h-4 w-4 text-amber-500" /> Ore Suplimentare — {formatMonthLabel(selectedMonth)}
           </h3>
           <p className="text-xs text-slate-400 mb-3">Angajați cu zile de lucru peste 8 ore</p>
           {overtimeData.length === 0 ? (
@@ -415,9 +483,12 @@ export default function Dashboard() {
                     </div>
                     <span className="text-sm font-medium text-slate-900">{emp.full_name}</span>
                   </div>
-                  <span className="text-sm font-bold" style={{ color: emp.overtimeDays > 5 ? "#f59e0b" : "#00b5b5" }}>
-                    {emp.overtimeDays} zile
-                  </span>
+                 <div className="text-right">
+  <p className="text-sm font-bold" style={{ color: emp.overtimeDays > 5 ? "#f59e0b" : "#00b5b5" }}>
+    {emp.overtimeStr}
+  </p>
+  <p className="text-xs text-slate-400">{emp.overtimeDays} {emp.overtimeDays === 1 ? "zi" : "zile"}</p>
+</div>
                 </div>
               ))}
             </div>
@@ -427,7 +498,7 @@ export default function Dashboard() {
 
       <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
         <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-          <Gift className="h-4 w-4 text-pink-400" /> Zile de Naștere Luna Aceasta
+          <Gift className="h-4 w-4 text-pink-400" /> Zile de Naștere — {formatMonthLabel(selectedMonth)}
         </h3>
         {birthdaysThisMonth.length === 0 ? (
           <p className="text-sm text-slate-400">Nicio zi de naștere în această lună</p>
