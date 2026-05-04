@@ -4,23 +4,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion as Motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { format } from "date-fns";
-import { CheckCircle, Clock, Coffee, LogOut, PlayCircle, MapPin, Users, Home, AlertCircle, Download, X, Check, CalendarDays, TrendingUp } from "lucide-react";
+import { CheckCircle, Clock, Coffee, LogOut, PlayCircle, MapPin, Users, Home, Download, X, Check, CalendarDays, TrendingUp, Timer } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-const STATUSES = [
+const WORK_LOCATIONS = [
   { id: "acasa", label: "Acasă", icon: Home, color: "#00b5b5" },
   { id: "teren", label: "În teren", icon: MapPin, color: "#f59e0b" },
-  { id: "sedinta", label: "În ședință", icon: Users, color: "#8b5cf6" },
-  { id: "indisponibil", label: "Indisponibil", icon: AlertCircle, color: "#ef4444" },
-];
-
-const EVENTS = [
-  { id: "check_in", label: "Început zi", icon: PlayCircle, color: "#00b5b5" },
-  { id: "location_change", label: "Schimbare locație", icon: MapPin, color: "#8b5cf6" },
-  { id: "break_start", label: "Început pauză", icon: Coffee, color: "#f59e0b" },
-  { id: "break_end", label: "Sfârșit pauză", icon: PlayCircle, color: "#8b5cf6" },
-  { id: "check_out", label: "Sfârșit zi", icon: LogOut, color: "#ef4444" },
 ];
 
 const LEAVE_TYPES = [
@@ -29,121 +19,106 @@ const LEAVE_TYPES = [
   { id: "concediu_fara_plata", label: "Fără plată" },
 ];
 
-function timeToMinutes(t) {
-  if (!t) return null;
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
-
-function calculateHours(evs) {
+function calcHours(evs) {
   let total = 0, breakTime = 0, checkIn = null, breakStart = null;
   evs.forEach(e => {
-    const time = e.time ? e.time.split(":").map(Number) : null;
-    if (!time) return;
-    const minutes = time[0] * 60 + time[1];
-    if (e.event_type === "check_in") checkIn = minutes;
-    if (e.event_type === "break_start") breakStart = minutes;
-    if (e.event_type === "break_end" && breakStart) { breakTime += minutes - breakStart; breakStart = null; }
-    if (e.event_type === "check_out" && checkIn) { total = minutes - checkIn - breakTime; }
+    const t = e.time ? e.time.split(":").map(Number) : null;
+    if (!t) return;
+    const min = t[0] * 60 + t[1];
+    if (e.event_type === "check_in") checkIn = min;
+    if (e.event_type === "break_start" || e.event_type === "meeting_start") breakStart = min;
+    if ((e.event_type === "break_end" || e.event_type === "meeting_end") && breakStart) {
+      breakTime += min - breakStart; breakStart = null;
+    }
+    if (e.event_type === "check_out" && checkIn) total = min - checkIn - breakTime;
   });
   if (total <= 0) return null;
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return `${h}h ${m > 0 ? m + "min" : ""}`.trim();
+  return Math.floor(total / 60) + "h" + (total % 60 > 0 ? " " + total % 60 + "min" : "");
 }
 
-function calculateOvertimeMinutes(evs) {
+function calcOvertimeMin(evs) {
   let total = 0, breakTime = 0, checkIn = null, breakStart = null;
   evs.forEach(e => {
-    const time = e.time ? e.time.split(":").map(Number) : null;
-    if (!time) return;
-    const minutes = time[0] * 60 + time[1];
-    if (e.event_type === "check_in") checkIn = minutes;
-    if (e.event_type === "break_start") breakStart = minutes;
-    if (e.event_type === "break_end" && breakStart) { breakTime += minutes - breakStart; breakStart = null; }
-    if (e.event_type === "check_out" && checkIn) { total = minutes - checkIn - breakTime; }
+    const t = e.time ? e.time.split(":").map(Number) : null;
+    if (!t) return;
+    const min = t[0] * 60 + t[1];
+    if (e.event_type === "check_in") checkIn = min;
+    if (e.event_type === "break_start" || e.event_type === "meeting_start") breakStart = min;
+    if ((e.event_type === "break_end" || e.event_type === "meeting_end") && breakStart) {
+      breakTime += min - breakStart; breakStart = null;
+    }
+    if (e.event_type === "check_out" && checkIn) total = min - checkIn - breakTime;
   });
   return total > 480 ? total - 480 : 0;
 }
 
-function getEventLabel(ev) {
-  if (ev.event_type === "location_change") {
-    const status = STATUSES.find(s => s.id === ev.location);
-    return "Schimbare locatie -> " + (status?.label || ev.location || "—");
-  }
-  return EVENTS.find(e => e.id === ev.event_type)?.label || ev.event_type;
+function eventLabel(ev) {
+  const map = {
+    check_in: "Început zi",
+    check_out: "Sfârșit zi",
+    break_start: "Început pauză",
+    break_end: "Sfârșit pauză",
+    meeting_start: "Intrat în ședință",
+    meeting_end: "Ieșit din ședință",
+    overtime_start: "Început ore suplimentare",
+  };
+  return map[ev.event_type] || ev.event_type;
 }
 
-function getEventColor(ev) {
-  if (ev.event_type === "location_change") {
-    return STATUSES.find(s => s.id === ev.location)?.color || "#8b5cf6";
-  }
-  return EVENTS.find(e => e.id === ev.event_type)?.color || "#00b5b5";
+function eventColor(ev) {
+  const map = {
+    check_in: "#00b5b5",
+    check_out: "#ef4444",
+    break_start: "#f59e0b",
+    break_end: "#f59e0b",
+    meeting_start: "#8b5cf6",
+    meeting_end: "#8b5cf6",
+    overtime_start: "#f97316",
+  };
+  return map[ev.event_type] || "#00b5b5";
+}
+
+function ActionBtn({ onClick, color, icon: Icon, label, disabled }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-sm text-white disabled:opacity-60 w-full transition-all hover:opacity-90"
+      style={{ backgroundColor: color }}>
+      {Icon && <Icon className="h-4 w-4" />} {label}
+    </button>
+  );
 }
 
 export default function Attendance() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [selectedStatus, setSelectedStatus] = useState("acasa");
-  const todayStr = new Date().toISOString().split("T")[0];
-  const [exportMonth, setExportMonth] = useState(format(new Date(), "yyyy-MM"));
+  const qc = useQueryClient();
+  const [selectedLocation, setSelectedLocation] = useState("acasa");
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [leaveForm, setLeaveForm] = useState({ type: "concediu_odihna", start_date: "", end_date: "", reason: "" });
+  const [exportMonth, setExportMonth] = useState(format(new Date(), "yyyy-MM"));
+  const todayStr = new Date().toISOString().split("T")[0];
 
-  const { data: employees = [] } = useQuery({
-    queryKey: ["employees"],
-    queryFn: () => appClient.entities.Employee.list(),
-  });
-
-  const { data: records = [] } = useQuery({
-    queryKey: ["attendance"],
-    queryFn: () => appClient.entities.Attendance.list(500),
-    refetchInterval: 30000,
-  });
-
-  const { data: events = [] } = useQuery({
-    queryKey: ["attendance-events"],
-    queryFn: () => appClient.entities.AttendanceEvent.list(500),
-    refetchInterval: 30000,
-  });
-
+  const { data: employees = [] } = useQuery({ queryKey: ["employees"], queryFn: () => appClient.entities.Employee.list() });
+  const { data: records = [] } = useQuery({ queryKey: ["attendance"], queryFn: () => appClient.entities.Attendance.list(500), refetchInterval: 15000 });
+  const { data: events = [] } = useQuery({ queryKey: ["attendance-events"], queryFn: () => appClient.entities.AttendanceEvent.list(500), refetchInterval: 15000 });
   const { data: leaveRequests = [] } = useQuery({
-    queryKey: ["leave-requests", user?.email, user?.isManager],
-    queryFn: () => appClient.entities.LeaveRequest.list(user?.isManager ? 200 : 50),
+    queryKey: ["leave-requests", user?.email],
+    queryFn: () => appClient.entities.LeaveRequest.list(200),
     refetchInterval: 30000,
-    select: (data) => user?.isManager
-      ? data
-      : data.filter(r => r.employee_email === user?.email),
+    select: d => user?.isManager ? d : d.filter(r => r.employee_email === user?.email),
   });
 
-  const createRecordMutation = useMutation({
-    mutationFn: (data) => appClient.entities.Attendance.create(data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["attendance"] }),
-  });
-
-  const createEventMutation = useMutation({
-    mutationFn: (data) => appClient.entities.AttendanceEvent.create(data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["attendance-events"] }),
-  });
-
-  const updateEmployeeMutation = useMutation({
-    mutationFn: ({ id, data }) => appClient.entities.Employee.update(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["employees"] }),
-  });
-
-  const createLeaveMutation = useMutation({
-    mutationFn: (data) => appClient.entities.LeaveRequest.create(data),
+  const createRecord = useMutation({ mutationFn: d => appClient.entities.Attendance.create(d), onSuccess: () => qc.invalidateQueries({ queryKey: ["attendance"] }) });
+  const createEvent = useMutation({ mutationFn: d => appClient.entities.AttendanceEvent.create(d), onSuccess: () => qc.invalidateQueries({ queryKey: ["attendance-events"] }) });
+  const updateEmp = useMutation({ mutationFn: ({ id, data }) => appClient.entities.Employee.update(id, data), onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }) });
+  const createLeave = useMutation({
+    mutationFn: d => appClient.entities.LeaveRequest.create(d),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
+      qc.invalidateQueries({ queryKey: ["leave-requests"] });
       setShowLeaveModal(false);
       setLeaveForm({ type: "concediu_odihna", start_date: "", end_date: "", reason: "" });
-    },
+    }
   });
-
-  const updateLeaveMutation = useMutation({
-    mutationFn: ({ id, data }) => appClient.entities.LeaveRequest.update(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leave-requests"] }),
-  });
+  const updateLeave = useMutation({ mutationFn: ({ id, data }) => appClient.entities.LeaveRequest.update(id, data), onSuccess: () => qc.invalidateQueries({ queryKey: ["leave-requests"] }) });
 
   const myEmployee = employees.find(e => e.email === user?.email);
   const myTodayRecord = records.find(r => r.employee_email === user?.email && r.date === todayStr);
@@ -151,148 +126,73 @@ export default function Attendance() {
     .filter(e => e.employee_email === user?.email && e.date === todayStr)
     .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
 
-  const lastEvent = myTodayEvents[myTodayEvents.length - 1];
-  const hasCheckedIn = myTodayEvents.some(e => e.event_type === "check_in");
-  const hasCheckedOut = myTodayEvents.some(e => e.event_type === "check_out");
-  const isOnBreak = lastEvent?.event_type === "break_start";
-  const hoursWorked = calculateHours(myTodayEvents);
+  const lastEv = myTodayEvents[myTodayEvents.length - 1];
+  const hasIn = myTodayEvents.some(e => e.event_type === "check_in");
+  const hasOut = myTodayEvents.some(e => e.event_type === "check_out");
+  const onBreak = lastEv?.event_type === "break_start";
+  const inMeeting = lastEv?.event_type === "meeting_start";
+  const hasOvertime = myTodayEvents.some(e => e.event_type === "overtime_start");
+  const hoursWorked = calcHours(myTodayEvents);
+  const isAfterWork = new Date().getHours() >= 17;
+  const isPending = createEvent.isPending;
 
-  const myLeaveRequests = leaveRequests
-    .filter(r => r.employee_email === user?.email)
-    .sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""));
-
-  const pendingLeaves = leaveRequests
-    .filter(r => r.status === "pending")
-    .sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""));
+  const pendingLeaves = leaveRequests.filter(r => r.status === "pending");
+  const myLeaves = leaveRequests.filter(r => r.employee_email === user?.email);
 
   const logEvent = async (eventType) => {
     const now = format(new Date(), "HH:mm");
     const empName = myEmployee?.full_name || user?.email;
-
-    const eventData = {
-      employee_email: user?.email,
-      employee_name: empName,
-      date: todayStr,
-      time: now,
-      event_type: eventType,
-    };
-    if (eventType === "location_change") {
-      eventData.location = selectedStatus;
-    }
-
     try {
-      await createEventMutation.mutateAsync(eventData);
-
-      if (eventType === "check_in") {
-        if (!myTodayRecord) {
-          await createRecordMutation.mutateAsync({
-            employee_email: user?.email,
-            employee_name: empName,
-            date: todayStr,
-            check_in: now,
-            status: "present",
-            work_location: selectedStatus,
-          });
-        }
-        if (myEmployee) {
-          await updateEmployeeMutation.mutateAsync({
-            id: myEmployee.id,
-            data: { current_status: selectedStatus },
-          });
-        }
-      }
-      if (eventType === "location_change" && myEmployee) {
-        await updateEmployeeMutation.mutateAsync({
-          id: myEmployee.id,
-          data: { current_status: selectedStatus },
+      await createEvent.mutateAsync({
+        employee_email: user?.email,
+        employee_name: empName,
+        date: todayStr,
+        time: now,
+        event_type: eventType,
+      });
+      const statusMap = {
+        check_in: selectedLocation,
+        break_start: "pauza",
+        break_end: selectedLocation,
+        meeting_start: "sedinta",
+        meeting_end: selectedLocation,
+        overtime_start: selectedLocation,
+        check_out: "indisponibil",
+      };
+      if (eventType === "check_in" && !myTodayRecord) {
+        await createRecord.mutateAsync({
+          employee_email: user?.email,
+          employee_name: empName,
+          date: todayStr,
+          check_in: now,
+          status: "present",
+          work_location: selectedLocation,
         });
       }
-      if (eventType === "break_start" && myEmployee) {
-        await updateEmployeeMutation.mutateAsync({
-          id: myEmployee.id,
-          data: { current_status: "pauza" },
-        });
+      if (myEmployee && statusMap[eventType]) {
+        await updateEmp.mutateAsync({ id: myEmployee.id, data: { current_status: statusMap[eventType] } });
       }
-      if (eventType === "break_end" && myEmployee) {
-        await updateEmployeeMutation.mutateAsync({
-          id: myEmployee.id,
-          data: { current_status: selectedStatus },
-        });
-      }
-      if (eventType === "check_out" && myEmployee) {
-        await updateEmployeeMutation.mutateAsync({
-          id: myEmployee.id,
-          data: { current_status: "indisponibil" },
-        });
-      }
-    } catch (err) {
-      console.error("Eroare logEvent:", err);
-    }
+    } catch (err) { console.error(err); }
   };
 
-  const handleStatusChange = (statusId) => {
-    setSelectedStatus(statusId);
-  };
-
-  const handleLeaveSubmit = () => {
-    if (!leaveForm.start_date || !leaveForm.end_date) return;
-    const empName = myEmployee?.full_name || user?.email;
-    createLeaveMutation.mutate({
-      employee_email: user?.email,
-      employee_name: empName,
-      type: leaveForm.type,
-      start_date: leaveForm.start_date,
-      end_date: leaveForm.end_date,
-      reason: leaveForm.reason,
-      status: "pending",
-    });
-  };
-
-  const handleLeaveAction = (id, status) => {
-    const empName = myEmployee?.full_name || user?.email;
-    updateLeaveMutation.mutate({
-      id,
-      data: { status, reviewed_by: empName, reviewed_at: new Date().toISOString() },
-    });
-  };
-
-  const getAvailableActions = () => {
-    if (!hasCheckedIn) return ["check_in"];
-    if (hasCheckedOut) return [];
-    if (isOnBreak) return ["break_end", "check_out"];
-    return ["location_change", "break_start", "check_out"];
-  };
-
-  const availableActions = getAvailableActions();
-
-  const getLeaveStatusStyle = (status) => {
-    if (status === "approved") return { bg: "#f0fdf4", color: "#16a34a", label: "Aprobat" };
-    if (status === "rejected") return { bg: "#fef2f2", color: "#ef4444", label: "Respins" };
-    return { bg: "#fffbeb", color: "#f59e0b", label: "În așteptare" };
-  };
+  const leaveStyle = s => s === "approved"
+    ? { bg: "#f0fdf4", color: "#16a34a", label: "Aprobat" }
+    : s === "rejected"
+    ? { bg: "#fef2f2", color: "#ef4444", label: "Respins" }
+    : { bg: "#fffbeb", color: "#f59e0b", label: "În așteptare" };
 
   const exportPDF = () => {
     const doc = new jsPDF();
-    const monthRecords = records.filter(r => r.date && r.date.startsWith(exportMonth));
-    doc.setFontSize(18);
-    doc.setTextColor(0, 181, 181);
-    doc.text("Alex Tours - Raport Prezenta", 14, 20);
-    doc.setFontSize(11);
-    doc.setTextColor(100);
+    const recs = records.filter(r => r.date?.startsWith(exportMonth));
+    doc.setFontSize(18); doc.setTextColor(0, 181, 181); doc.text("Alex Tours - Raport Prezenta", 14, 20);
+    doc.setFontSize(11); doc.setTextColor(100);
     doc.text("Luna: " + exportMonth, 14, 30);
     doc.text("Generat: " + format(new Date(), "dd.MM.yyyy HH:mm"), 14, 37);
     autoTable(doc, {
       startY: 45,
       head: [["Angajat", "Data", "Check-in", "Status", "Locatie"]],
-      body: monthRecords.map(r => [
-        r.employee_name || "-",
-        r.date || "-",
-        r.check_in || "-",
-        r.status === "present" ? "Prezent" : "Absent",
-        r.work_location || "-",
-      ]),
+      body: recs.map(r => [r.employee_name || "-", r.date || "-", r.check_in || "-", r.status === "present" ? "Prezent" : "Absent", r.work_location || "-"]),
       headStyles: { fillColor: [0, 181, 181], textColor: 255 },
-      alternateRowStyles: { fillColor: [240, 250, 250] },
     });
     doc.save("prezenta-" + exportMonth + ".pdf");
   };
@@ -300,214 +200,202 @@ export default function Attendance() {
   return (
     <div className="space-y-6">
 
+      {/* ANGAJAT */}
       {!user?.isManager && (
-        <Motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl border border-slate-200/60 p-6">
-          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Clock className="h-4 w-4" style={{ color: "#00b5b5" }} />
-            Ziua Mea de Lucru — {format(new Date(), "d MMMM yyyy")}
-          </h3>
+        <>
+          <Motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <Clock className="h-4 w-4" style={{ color: "#00b5b5" }} />
+              Ziua Mea — {format(new Date(), "d MMMM yyyy")}
+            </h3>
 
-          {myTodayEvents.length > 0 && (
-            <div className="mb-5 space-y-2">
-              {myTodayEvents.map((ev, i) => (
-                <div key={i} className="flex items-center gap-3 text-sm">
-                  <span className="text-slate-400 font-mono w-12">{ev.time}</span>
-                  <div className="h-2 w-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: getEventColor(ev) }} />
-                  <span className="text-slate-700">{getEventLabel(ev)}</span>
-                </div>
-              ))}
-              {hoursWorked && (
-                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-sm font-semibold"
-                  style={{ color: "#00b5b5" }}>
-                  <Clock className="h-4 w-4" />
-                  Total ore lucrate: {hoursWorked}
-                </div>
-              )}
-            </div>
-          )}
+            {/* Timeline */}
+            {myTodayEvents.length > 0 && (
+              <div className="mb-5 border-l-2 border-slate-100 pl-4 ml-1 space-y-2">
+                {myTodayEvents.map((ev, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm relative">
+                    <div className="h-2 w-2 rounded-full absolute -left-5" style={{ backgroundColor: eventColor(ev) }} />
+                    <span className="text-slate-400 font-mono w-12 flex-shrink-0">{ev.time}</span>
+                    <span className="text-slate-700">{eventLabel(ev)}</span>
+                  </div>
+                ))}
+                {hoursWorked && (
+                  <p className="text-sm font-semibold pt-2 border-t border-slate-100" style={{ color: "#00b5b5" }}>
+                    ✓ Total ore lucrate: {hoursWorked}
+                  </p>
+                )}
+              </div>
+            )}
 
-          {!hasCheckedOut && (
-            <div className="mb-4">
-              <p className="text-xs text-slate-500 mb-2">
-                {!hasCheckedIn ? "Unde lucrezi azi?" : "Schimba locatia:"}
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {STATUSES.filter(s => s.id !== "indisponibil").map(s => {
-                  const isActive = selectedStatus === s.id;
-                  return (
-                    <button key={s.id} onClick={() => handleStatusChange(s.id)}
-                      className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 text-xs font-medium transition-all"
+            {/* Status curent */}
+            {hasIn && !hasOut && (
+              <div className="mb-4 p-3 rounded-xl flex items-center gap-2 text-sm font-medium"
+                style={{
+                  backgroundColor: onBreak ? "#fffbeb" : inMeeting ? "#f5f3ff" : "#f0fafa",
+                  color: onBreak ? "#f59e0b" : inMeeting ? "#8b5cf6" : "#00b5b5"
+                }}>
+                {onBreak ? <Coffee className="h-4 w-4" /> : inMeeting ? <Users className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                {onBreak ? "Ești în pauză" : inMeeting ? "Ești în ședință" : "Lucrezi activ"}
+              </div>
+            )}
+
+            {/* Selector locatie */}
+            {!hasIn && (
+              <div className="mb-4">
+                <p className="text-xs text-slate-500 mb-2">Unde lucrezi azi?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {WORK_LOCATIONS.map(s => (
+                    <button key={s.id} onClick={() => setSelectedLocation(s.id)}
+                      className="flex flex-col items-center gap-1 py-3 rounded-xl border-2 text-xs font-medium transition-all"
                       style={{
-                        borderColor: isActive ? s.color : "#e2e8f0",
-                        backgroundColor: isActive ? s.color + "15" : "white",
-                        color: isActive ? s.color : "#64748b",
+                        borderColor: selectedLocation === s.id ? s.color : "#e2e8f0",
+                        backgroundColor: selectedLocation === s.id ? s.color + "15" : "white",
+                        color: selectedLocation === s.id ? s.color : "#64748b",
                       }}>
                       <s.icon className="h-5 w-5" />
                       {s.label}
                     </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Butoane actiuni */}
+            <div className="space-y-2">
+              {!hasIn && (
+                <ActionBtn onClick={() => logEvent("check_in")} color="#00b5b5" icon={PlayCircle}
+                  label={"Începe ziua de lucru — " + format(new Date(), "HH:mm")} disabled={isPending} />
+              )}
+
+              {hasIn && !hasOut && !onBreak && !inMeeting && (
+                <div className="grid grid-cols-2 gap-2">
+                  <ActionBtn onClick={() => logEvent("break_start")} color="#f59e0b" icon={Coffee} label="Pauză" disabled={isPending} />
+                  <ActionBtn onClick={() => logEvent("meeting_start")} color="#8b5cf6" icon={Users} label="Intru în ședință" disabled={isPending} />
+                  {isAfterWork && !hasOvertime && (
+                    <ActionBtn onClick={() => logEvent("overtime_start")} color="#f97316" icon={Timer} label="Ore suplimentare" disabled={isPending} />
+                  )}
+                  <ActionBtn onClick={() => logEvent("check_out")} color="#ef4444" icon={LogOut}
+                    label={"Sfârșit zi — " + format(new Date(), "HH:mm")} disabled={isPending} />
+                </div>
+              )}
+
+              {hasIn && !hasOut && onBreak && (
+                <div className="grid grid-cols-2 gap-2">
+                  <ActionBtn onClick={() => logEvent("break_end")} color="#00b5b5" icon={PlayCircle} label="Reiau lucrul" disabled={isPending} />
+                  <ActionBtn onClick={() => logEvent("check_out")} color="#ef4444" icon={LogOut} label="Sfârșit zi" disabled={isPending} />
+                </div>
+              )}
+
+              {hasIn && !hasOut && inMeeting && (
+                <div className="grid grid-cols-2 gap-2">
+                  <ActionBtn onClick={() => logEvent("meeting_end")} color="#8b5cf6" icon={Users} label="Ies din ședință" disabled={isPending} />
+                  <ActionBtn onClick={() => logEvent("check_out")} color="#ef4444" icon={LogOut} label="Sfârșit zi" disabled={isPending} />
+                </div>
+              )}
+
+              {isAfterWork && hasIn && !hasOut && (
+                <div className="p-3 rounded-xl text-xs flex items-center gap-2" style={{ backgroundColor: "#fff7ed", color: "#f97316" }}>
+                  <Timer className="h-4 w-4 flex-shrink-0" />
+                  Programul s-a încheiat la 17:00. Orele lucrate acum sunt ore suplimentare (art. 120 Codul Muncii).
+                </div>
+              )}
+
+              {hasOut && (
+                <div className="flex items-center gap-3 p-4 rounded-xl" style={{ backgroundColor: "#f0fafa" }}>
+                  <CheckCircle className="h-6 w-6" style={{ color: "#00b5b5" }} />
+                  <div>
+                    <p className="font-medium text-slate-900">Zi de lucru încheiată!</p>
+                    {hoursWorked && <p className="text-sm text-slate-500">Total: {hoursWorked}</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Motion.div>
+
+          {/* Cereri concediu */}
+          <Motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <CalendarDays className="h-4 w-4" style={{ color: "#00b5b5" }} />
+                Cererile Mele de Concediu
+              </h3>
+              <button onClick={() => setShowLeaveModal(true)}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white" style={{ backgroundColor: "#00b5b5" }}>
+                + Cerere nouă
+              </button>
+            </div>
+            {myLeaves.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-4">Nicio cerere înregistrată</p>
+            ) : (
+              <div className="space-y-3">
+                {myLeaves.map(req => {
+                  const s = leaveStyle(req.status);
+                  return (
+                    <div key={req.id} className="flex items-center gap-4 p-3 rounded-xl border border-slate-100">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900">{LEAVE_TYPES.find(t => t.id === req.type)?.label || req.type}</p>
+                        <p className="text-xs text-slate-400">{req.start_date} - {req.end_date}{req.reason && " · " + req.reason}</p>
+                        {req.reviewed_by && <p className="text-xs text-slate-400">Revizuit de {req.reviewed_by}</p>}
+                      </div>
+                      <span className="text-xs font-semibold px-3 py-1 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: s.bg, color: s.color }}>{s.label}</span>
+                    </div>
                   );
                 })}
               </div>
-            </div>
-          )}
-
-          {hasCheckedIn && !hasCheckedOut && (
-            <div className="mb-3 p-3 rounded-xl text-xs flex items-center gap-2"
-              style={{ backgroundColor: "#fffbeb", color: "#f59e0b" }}>
-              <span>⏱</span>
-              <span>Programul normal e 09:00-17:00. Orele peste program se calculeaza automat ca ore suplimentare.</span>
-            </div>
-          )}
-
-          {availableActions.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {availableActions.map(actionId => {
-                const action = EVENTS.find(e => e.id === actionId);
-                if (!action) return null;
-                const isLocationChange = actionId === "location_change";
-                const currentStatus = STATUSES.find(s => s.id === selectedStatus);
-                return (
-                  <button key={actionId}
-                    onClick={() => logEvent(actionId)}
-                    disabled={createEventMutation.isPending}
-                    className="flex items-center justify-center gap-2 py-4 rounded-xl font-semibold text-sm transition-all text-white disabled:opacity-60"
-                    style={{
-                      backgroundColor: isLocationChange
-                        ? (currentStatus?.color || action.color)
-                        : action.color,
-                    }}>
-                    <action.icon className="h-5 w-5" />
-                    {isLocationChange
-                      ? "Trec la: " + (currentStatus?.label || selectedStatus)
-                      : action.label + " — " + format(new Date(), "HH:mm")
-                    }
-                  </button>
-                );
-              })}
-            </div>
-          ) : hasCheckedOut ? (
-            <div className="flex items-center gap-3 p-4 rounded-xl" style={{ backgroundColor: "#f0fafa" }}>
-              <CheckCircle className="h-6 w-6" style={{ color: "#00b5b5" }} />
-              <div>
-                <p className="font-medium text-slate-900">Zi de lucru incheiata!</p>
-                {hoursWorked && <p className="text-sm text-slate-500">Total: {hoursWorked}</p>}
-              </div>
-            </div>
-          ) : null}
-        </Motion.div>
+            )}
+          </Motion.div>
+        </>
       )}
 
-      {!user?.isManager && (
-        <Motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white rounded-2xl border border-slate-200/60 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-              <CalendarDays className="h-4 w-4" style={{ color: "#00b5b5" }} />
-              Cererile Mele de Concediu
-            </h3>
-            <button onClick={() => setShowLeaveModal(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white"
-              style={{ backgroundColor: "#00b5b5" }}>
-              + Cerere noua
-            </button>
-          </div>
-          {myLeaveRequests.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-6">Nicio cerere de concediu inregistrata</p>
-          ) : (
-            <div className="space-y-3">
-              {myLeaveRequests.map(req => {
-                const style = getLeaveStatusStyle(req.status);
-                const leaveType = LEAVE_TYPES.find(t => t.id === req.type);
-                return (
-                  <div key={req.id} className="flex items-center gap-4 p-4 rounded-xl border border-slate-100">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900">{leaveType?.label || req.type}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {req.start_date} - {req.end_date}
-                        {req.reason && " · " + req.reason}
-                      </p>
-                      {req.reviewed_by && (
-                        <p className="text-xs text-slate-400">Revizuit de {req.reviewed_by}</p>
-                      )}
-                    </div>
-                    <span className="text-xs font-semibold px-3 py-1 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: style.bg, color: style.color }}>
-                      {style.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Motion.div>
-      )}
-
+      {/* MANAGER */}
       {user?.isManager && (
-        <React.Fragment>
+        <>
           <div className="grid grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl border border-slate-200/60 p-5 text-center">
-              <p className="text-3xl font-bold" style={{ color: "#00b5b5" }}>
-                {records.filter(r => r.date === todayStr && r.status === "present").length}
-              </p>
-              <p className="text-sm text-slate-500 mt-1">Prezenti Azi</p>
-            </div>
-            <div className="bg-white rounded-2xl border border-slate-200/60 p-5 text-center">
-              <p className="text-3xl font-bold text-red-400">
-                {records.filter(r => r.date === todayStr && r.status === "absent").length}
-              </p>
-              <p className="text-sm text-slate-500 mt-1">Absenti Azi</p>
-            </div>
-            <div className="bg-white rounded-2xl border border-slate-200/60 p-5 text-center">
-              <p className="text-3xl font-bold text-amber-400">{pendingLeaves.length}</p>
-              <p className="text-sm text-slate-500 mt-1">Cereri in asteptare</p>
-            </div>
+            {[
+              { val: records.filter(r => r.date === todayStr && r.status === "present").length, label: "Prezenți Azi", color: "#00b5b5" },
+              { val: records.filter(r => r.date === todayStr && r.status === "absent").length, label: "Absenți Azi", color: "#ef4444" },
+              { val: pendingLeaves.length, label: "Cereri în așteptare", color: "#f59e0b" },
+            ].map(({ val, label, color }) => (
+              <div key={label} className="bg-white rounded-2xl border border-slate-200/60 p-5 text-center">
+                <p className="text-3xl font-bold" style={{ color }}>{val}</p>
+                <p className="text-sm text-slate-500 mt-1">{label}</p>
+              </div>
+            ))}
           </div>
 
           {pendingLeaves.length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
               <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-amber-500" />
-                Cereri de Concediu in Asteptare
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
-                  {pendingLeaves.length}
-                </span>
+                <CalendarDays className="h-4 w-4 text-amber-500" /> Cereri în Așteptare
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">{pendingLeaves.length}</span>
               </h3>
               <div className="space-y-3">
-                {pendingLeaves.map(req => {
-                  const leaveType = LEAVE_TYPES.find(t => t.id === req.type);
-                  return (
-                    <div key={req.id}
-                      className="flex items-center gap-4 p-4 rounded-xl border border-amber-100 bg-amber-50/50">
-                      <div className="h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                        style={{ backgroundColor: "#00b5b5" }}>
-                        {req.employee_name?.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-900">{req.employee_name}</p>
-                        <p className="text-xs text-slate-500">
-                          {leaveType?.label || req.type} · {req.start_date} - {req.end_date}
-                        </p>
-                        {req.reason && (
-                          <p className="text-xs text-slate-400 mt-0.5">"{req.reason}"</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <button onClick={() => handleLeaveAction(req.id, "approved")}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-white"
-                          style={{ backgroundColor: "#00b5b5" }}>
-                          <Check className="h-3.5 w-3.5" /> Aproba
-                        </button>
-                        <button onClick={() => handleLeaveAction(req.id, "rejected")}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-white bg-red-400">
-                          <X className="h-3.5 w-3.5" /> Respinge
-                        </button>
-                      </div>
+                {pendingLeaves.map(req => (
+                  <div key={req.id} className="flex items-center gap-4 p-4 rounded-xl border border-amber-100 bg-amber-50/50">
+                    <div className="h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                      style={{ backgroundColor: "#00b5b5" }}>
+                      {req.employee_name?.charAt(0).toUpperCase()}
                     </div>
-                  );
-                })}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">{req.employee_name}</p>
+                      <p className="text-xs text-slate-500">{LEAVE_TYPES.find(t => t.id === req.type)?.label} · {req.start_date} - {req.end_date}</p>
+                      {req.reason && <p className="text-xs text-slate-400">"{req.reason}"</p>}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => updateLeave.mutate({ id: req.id, data: { status: "approved", reviewed_by: myEmployee?.full_name || user?.email } })}
+                        className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium text-white" style={{ backgroundColor: "#00b5b5" }}>
+                        <Check className="h-3.5 w-3.5" /> Aprobă
+                      </button>
+                      <button onClick={() => updateLeave.mutate({ id: req.id, data: { status: "rejected", reviewed_by: myEmployee?.full_name || user?.email } })}
+                        className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium text-white bg-red-400">
+                        <X className="h-3.5 w-3.5" /> Respinge
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -515,34 +403,25 @@ export default function Attendance() {
           {leaveRequests.filter(r => r.status !== "pending").length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
               <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <CalendarDays className="h-4 w-4" style={{ color: "#00b5b5" }} />
-                Istoric Cereri Concediu
+                <CalendarDays className="h-4 w-4" style={{ color: "#00b5b5" }} /> Istoric Cereri Concediu
               </h3>
               <div className="space-y-2">
-                {leaveRequests
-                  .filter(r => r.status !== "pending")
+                {leaveRequests.filter(r => r.status !== "pending")
                   .sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""))
-                  .slice(0, 10)
-                  .map(req => {
-                    const style = getLeaveStatusStyle(req.status);
-                    const leaveType = LEAVE_TYPES.find(t => t.id === req.type);
+                  .slice(0, 10).map(req => {
+                    const s = leaveStyle(req.status);
                     return (
-                      <div key={req.id}
-                        className="flex items-center gap-3 p-3 rounded-xl border border-slate-100">
+                      <div key={req.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100">
                         <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                           style={{ backgroundColor: "#00b5b5" }}>
                           {req.employee_name?.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-900">{req.employee_name}</p>
-                          <p className="text-xs text-slate-400">
-                            {leaveType?.label} · {req.start_date} - {req.end_date}
-                          </p>
+                          <p className="text-xs text-slate-400">{LEAVE_TYPES.find(t => t.id === req.type)?.label} · {req.start_date} - {req.end_date}</p>
                         </div>
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: style.bg, color: style.color }}>
-                          {style.label}
-                        </span>
+                          style={{ backgroundColor: s.bg, color: s.color }}>{s.label}</span>
                       </div>
                     );
                   })}
@@ -551,62 +430,39 @@ export default function Attendance() {
           )}
 
           <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <div className="flex items-center justify-between mb-6">
               <h3 className="font-semibold text-slate-900">Raport Pontaj per Angajat</h3>
-              <input type="month" value={exportMonth}
-                onChange={e => setExportMonth(e.target.value)}
+              <input type="month" value={exportMonth} onChange={e => setExportMonth(e.target.value)}
                 className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm" />
             </div>
             <div className="space-y-3">
               {employees.filter(e => e.status === "active").map(emp => {
-                const empEvents = events.filter(ev =>
-                  ev.employee_email === emp.email && ev.date && ev.date.startsWith(exportMonth)
-                );
-                const empRecords = records.filter(r =>
-                  r.employee_email === emp.email && r.date && r.date.startsWith(exportMonth)
-                );
-                const zilePrezente = empRecords.filter(r => r.status === "present").length;
-                const zileAbsente = empRecords.filter(r => r.status === "absent").length;
-                let totalMinute = 0;
-                let totalOvertimeMinute = 0;
-
-                [...new Set(empEvents.map(e => e.date))].forEach(date => {
-                  const dayEvents = empEvents
-                    .filter(e => e.date === date)
-                    .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
-                  let checkIn = null, breakStart = null, breakTime = 0, dayTotal = 0;
-                  dayEvents.forEach(ev => {
-                    const time = ev.time ? ev.time.split(":").map(Number) : null;
-                    if (!time) return;
-                    const minutes = time[0] * 60 + time[1];
-                    if (ev.event_type === "check_in") checkIn = minutes;
-                    if (ev.event_type === "break_start") breakStart = minutes;
-                    if (ev.event_type === "break_end" && breakStart) {
-                      breakTime += minutes - breakStart;
-                      breakStart = null;
-                    }
-                    if (ev.event_type === "check_out" && checkIn) {
-                      dayTotal = minutes - checkIn - breakTime;
-                    }
+                const empEvs = events.filter(ev => ev.employee_email === emp.email && ev.date?.startsWith(exportMonth));
+                const empRecs = records.filter(r => r.employee_email === emp.email && r.date?.startsWith(exportMonth));
+                const prez = empRecs.filter(r => r.status === "present").length;
+                const abs = empRecs.filter(r => r.status === "absent").length;
+                let totalMin = 0, otMin = 0;
+                [...new Set(empEvs.map(e => e.date))].forEach(date => {
+                  const de = empEvs.filter(e => e.date === date).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+                  let ci = null, bs = null, bt = 0, dt = 0;
+                  de.forEach(ev => {
+                    const t = ev.time?.split(":").map(Number);
+                    if (!t) return;
+                    const m = t[0] * 60 + t[1];
+                    if (ev.event_type === "check_in") ci = m;
+                    if (ev.event_type === "break_start" || ev.event_type === "meeting_start") bs = m;
+                    if ((ev.event_type === "break_end" || ev.event_type === "meeting_end") && bs) { bt += m - bs; bs = null; }
+                    if (ev.event_type === "check_out" && ci) dt = m - ci - bt;
                   });
-                  totalMinute += dayTotal;
-                  if (dayTotal > 480) totalOvertimeMinute += dayTotal - 480;
+                  totalMin += dt;
+                  if (dt > 480) otMin += dt - 480;
                 });
-
-                const oreLucrate = totalMinute > 0
-                  ? Math.floor(totalMinute / 60) + "h " + (totalMinute % 60 > 0 ? totalMinute % 60 + "min" : "")
-                  : "—";
-                const oreSupl = totalOvertimeMinute > 0
-                  ? Math.floor(totalOvertimeMinute / 60) + "h " + (totalOvertimeMinute % 60 > 0 ? totalOvertimeMinute % 60 + "min" : "")
-                  : null;
-                const zileSupl = [...new Set(empEvents.map(e => e.date))].filter(date => {
-                  const dayEvs = empEvents.filter(e => e.date === date);
-                  return calculateOvertimeMinutes(dayEvs) > 0;
-                }).length;
+                const ore = totalMin > 0 ? Math.floor(totalMin / 60) + "h" + (totalMin % 60 > 0 ? " " + totalMin % 60 + "min" : "") : "—";
+                const ot = otMin > 0 ? Math.floor(otMin / 60) + "h" + (otMin % 60 > 0 ? " " + otMin % 60 + "min" : "") : null;
+                const otZ = [...new Set(empEvs.map(e => e.date))].filter(d => calcOvertimeMin(empEvs.filter(e => e.date === d)) > 0).length;
 
                 return (
-                  <div key={emp.id}
-                    className="rounded-xl border border-slate-100 hover:border-slate-200 transition-colors overflow-hidden">
+                  <div key={emp.id} className="rounded-xl border border-slate-100 hover:border-slate-200 overflow-hidden">
                     <div className="flex items-center gap-4 p-4">
                       <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
                         style={{ backgroundColor: "#00b5b5" }}>
@@ -617,133 +473,68 @@ export default function Attendance() {
                         <p className="text-xs text-slate-400">{emp.department}</p>
                       </div>
                       <div className="flex items-center gap-4 text-center">
-                        <div>
-                          <p className="text-lg font-bold" style={{ color: "#00b5b5" }}>{zilePrezente}</p>
-                          <p className="text-xs text-slate-400">Prezent</p>
-                        </div>
-                        <div>
-                          <p className="text-lg font-bold text-red-400">{zileAbsente}</p>
-                          <p className="text-xs text-slate-400">Absent</p>
-                        </div>
-                        <div>
-                          <p className="text-lg font-bold text-slate-700">{oreLucrate}</p>
-                          <p className="text-xs text-slate-400">Ore lucrate</p>
-                        </div>
-                        {oreSupl && (
+                        <div><p className="text-lg font-bold" style={{ color: "#00b5b5" }}>{prez}</p><p className="text-xs text-slate-400">Prezent</p></div>
+                        <div><p className="text-lg font-bold text-red-400">{abs}</p><p className="text-xs text-slate-400">Absent</p></div>
+                        <div><p className="text-lg font-bold text-slate-700">{ore}</p><p className="text-xs text-slate-400">Ore</p></div>
+                        {ot && (
                           <div className="px-3 py-1 rounded-xl" style={{ backgroundColor: "#fffbeb" }}>
-                            <p className="text-sm font-bold" style={{ color: "#f59e0b" }}>{oreSupl}</p>
-                            <p className="text-xs" style={{ color: "#f59e0b" }}>Ore supl. ({zileSupl}z)</p>
+                            <p className="text-sm font-bold" style={{ color: "#f59e0b" }}>{ot}</p>
+                            <p className="text-xs" style={{ color: "#f59e0b" }}>Supl. ({otZ}z)</p>
                           </div>
                         )}
                       </div>
-                      <button
-                        onClick={() => {
-                          const doc = new jsPDF();
-                          const pageWidth = doc.internal.pageSize.getWidth();
-                          doc.setFillColor(26, 58, 58);
-                          doc.rect(0, 0, pageWidth, 40, "F");
-                          doc.setFontSize(20);
-                          doc.setTextColor(255, 255, 255);
-                          doc.setFont("helvetica", "bold");
-                          doc.text("ALEX TOURS", 14, 18);
-                          doc.setFontSize(11);
-                          doc.setFont("helvetica", "normal");
-                          doc.setTextColor(0, 181, 181);
-                          doc.text("Raport Pontaj Lunar", 14, 28);
-                          doc.setTextColor(255, 255, 255);
-                          doc.text("Generat: " + format(new Date(), "dd.MM.yyyy HH:mm"), pageWidth - 14, 28, { align: "right" });
-                          doc.setFillColor(240, 250, 250);
-                          doc.rect(0, 40, pageWidth, 35, "F");
-                          doc.setFontSize(14);
-                          doc.setTextColor(26, 58, 58);
-                          doc.setFont("helvetica", "bold");
-                          doc.text(emp.full_name, 14, 55);
-                          doc.setFontSize(10);
-                          doc.setFont("helvetica", "normal");
-                          doc.setTextColor(100, 116, 139);
-                          doc.text("Departament: " + (emp.department || "—"), 14, 65);
-                          doc.text("Perioada: " + exportMonth, pageWidth / 2, 65, { align: "center" });
-                          doc.text("Email: " + emp.email, pageWidth - 14, 65, { align: "right" });
-                          const col = (pageWidth - 28) / 4;
-                          doc.setFillColor(0, 181, 181);
-                          doc.rect(14, 85, col - 4, 30, "F");
-                          doc.setFillColor(239, 68, 68);
-                          doc.rect(14 + col, 85, col - 4, 30, "F");
-                          doc.setFillColor(26, 58, 58);
-                          doc.rect(14 + col * 2, 85, col - 4, 30, "F");
-                          doc.setFillColor(245, 158, 11);
-                          doc.rect(14 + col * 3, 85, col - 4, 30, "F");
-                          doc.setTextColor(255, 255, 255);
-                          doc.setFont("helvetica", "bold");
-                          doc.setFontSize(16);
-                          doc.text(String(zilePrezente), 14 + col / 2, 97, { align: "center" });
-                          doc.text(String(zileAbsente), 14 + col + col / 2, 97, { align: "center" });
-                          doc.text(oreLucrate, 14 + col * 2 + col / 2, 97, { align: "center" });
-                          doc.text(oreSupl || "0h", 14 + col * 3 + col / 2, 97, { align: "center" });
-                          doc.setFontSize(8);
-                          doc.setFont("helvetica", "normal");
-                          doc.text("Zile Prezente", 14 + col / 2, 108, { align: "center" });
-                          doc.text("Zile Absente", 14 + col + col / 2, 108, { align: "center" });
-                          doc.text("Total Ore", 14 + col * 2 + col / 2, 108, { align: "center" });
-                          doc.text("Ore Suplimentare", 14 + col * 3 + col / 2, 108, { align: "center" });
-                          if (oreSupl) {
-                            doc.setFontSize(9);
-                            doc.setTextColor(245, 158, 11);
-                            doc.text("Spor ore suplimentare: " + zileSupl + " zile cu peste 8h lucrate", 14, 120);
-                            doc.setTextColor(100, 116, 139);
-                            doc.text("Conform art. 123 Codul Muncii - salariatii au dreptul la spor de minimum 75%", 14, 127);
-                            doc.text("din salariul de baza pentru primele 2 ore suplimentare si 100% pentru urmatoarele.", 14, 134);
-                          }
-                          autoTable(doc, {
-                            startY: oreSupl ? 142 : 125,
-                            head: [["Data", "Check-in", "Check-out", "Ore Lucrate", "Ore Supl.", "Locatie", "Status"]],
-                            body: empRecords.map(r => {
-                              const dayEvs = empEvents
-                                .filter(e => e.date === r.date)
-                                .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
-                              const checkOut = dayEvs.find(e => e.event_type === "check_out")?.time || "—";
-                              const dayHours = calculateHours(dayEvs) || "—";
-                              const dayOT = calculateOvertimeMinutes(dayEvs);
-                              const dayOTStr = dayOT > 0
-                                ? Math.floor(dayOT / 60) + "h " + (dayOT % 60 > 0 ? dayOT % 60 + "min" : "")
-                                : "—";
-                              return [
-                                r.date || "—",
-                                r.check_in || "—",
-                                checkOut,
-                                dayHours,
-                                dayOTStr,
-                                r.work_location || "—",
-                                r.status === "present" ? "Prezent" : "Absent",
-                              ];
-                            }),
-                            headStyles: { fillColor: [26, 58, 58], textColor: 255, fontStyle: "bold", fontSize: 9 },
-                            alternateRowStyles: { fillColor: [240, 250, 250] },
-                            styles: { fontSize: 9 },
-                          });
-                          const finalY = doc.lastAutoTable.finalY + 10;
-                          doc.setDrawColor(0, 181, 181);
-                          doc.setLineWidth(0.5);
-                          doc.line(14, finalY, pageWidth - 14, finalY);
-                          doc.setFontSize(8);
-                          doc.setTextColor(150);
-                          doc.text(
-                            "Document generat automat de sistemul Alex Tours Virtual Office",
-                            pageWidth / 2, finalY + 8, { align: "center" }
-                          );
-                          doc.save("pontaj-" + emp.full_name.replace(" ", "-") + "-" + exportMonth + ".pdf");
-                        }}
-                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-white flex-shrink-0"
+                      <button onClick={() => {
+                        const doc = new jsPDF();
+                        const pw = doc.internal.pageSize.getWidth();
+                        doc.setFillColor(26, 58, 58); doc.rect(0, 0, pw, 40, "F");
+                        doc.setFontSize(20); doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.text("ALEX TOURS", 14, 18);
+                        doc.setFontSize(11); doc.setFont("helvetica", "normal"); doc.setTextColor(0, 181, 181); doc.text("Raport Pontaj Lunar", 14, 28);
+                        doc.setTextColor(255, 255, 255); doc.text("Generat: " + format(new Date(), "dd.MM.yyyy HH:mm"), pw - 14, 28, { align: "right" });
+                        doc.setFillColor(240, 250, 250); doc.rect(0, 40, pw, 35, "F");
+                        doc.setFontSize(14); doc.setTextColor(26, 58, 58); doc.setFont("helvetica", "bold"); doc.text(emp.full_name, 14, 55);
+                        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 116, 139);
+                        doc.text("Departament: " + (emp.department || "—"), 14, 65);
+                        doc.text("Perioada: " + exportMonth, pw / 2, 65, { align: "center" });
+                        doc.text("Email: " + emp.email, pw - 14, 65, { align: "right" });
+                        const col = (pw - 28) / 4;
+                        [[0, 181, 181, String(prez), "Zile Prezente"], [239, 68, 68, String(abs), "Zile Absente"], [26, 58, 58, ore, "Total Ore"], [245, 158, 11, ot || "0h", "Ore Supl."]].forEach(([r, g, b, v, l], i) => {
+                          const x = 14 + col * i;
+                          doc.setFillColor(r, g, b); doc.rect(x, 85, col - 4, 30, "F");
+                          doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+                          doc.text(v, x + (col - 4) / 2, 97, { align: "center" });
+                          doc.setFontSize(7); doc.setFont("helvetica", "normal");
+                          doc.text(l, x + (col - 4) / 2, 108, { align: "center" });
+                        });
+                        autoTable(doc, {
+                          startY: 120,
+                          head: [["Data", "Check-in", "Check-out", "Ore", "Ore Supl.", "Locație", "Status"]],
+                          body: empRecs.map(r => {
+                            const de = empEvs.filter(e => e.date === r.date).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+                            const co = de.find(e => e.event_type === "check_out")?.time || "—";
+                            const dh = calcHours(de) || "—";
+                            const dot = calcOvertimeMin(de);
+                            return [r.date || "—", r.check_in || "—", co, dh, dot > 0 ? Math.floor(dot / 60) + "h" + (dot % 60 > 0 ? " " + dot % 60 + "min" : "") : "—", r.work_location || "—", r.status === "present" ? "Prezent" : "Absent"];
+                          }),
+                          headStyles: { fillColor: [26, 58, 58], textColor: 255, fontSize: 9 },
+                          alternateRowStyles: { fillColor: [240, 250, 250] },
+                          styles: { fontSize: 9 },
+                        });
+                        const fy = doc.lastAutoTable.finalY + 10;
+                        doc.setDrawColor(0, 181, 181); doc.setLineWidth(0.5); doc.line(14, fy, pw - 14, fy);
+                        doc.setFontSize(8); doc.setTextColor(150);
+                        doc.text("Document generat automat de Alex Tours Virtual Office", pw / 2, fy + 8, { align: "center" });
+                        doc.save("pontaj-" + emp.full_name.replace(" ", "-") + "-" + exportMonth + ".pdf");
+                      }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-white flex-shrink-0"
                         style={{ backgroundColor: "#00b5b5" }}>
-                        <Download className="h-3.5 w-3.5" />
-                        PDF
+                        <Download className="h-3.5 w-3.5" /> PDF
                       </button>
                     </div>
-                    {oreSupl && (
+                    {ot && (
                       <div className="px-4 pb-3 flex items-center gap-2">
-                        <TrendingUp className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#f59e0b" }} />
+                        <TrendingUp className="h-3.5 w-3.5" style={{ color: "#f59e0b" }} />
                         <p className="text-xs" style={{ color: "#f59e0b" }}>
-                          Spor ore suplimentare aplicabil — {zileSupl} {zileSupl === 1 ? "zi" : "zile"} cu peste 8h lucrate in {exportMonth}
+                          Spor ore suplimentare — {otZ} {otZ === 1 ? "zi" : "zile"} cu peste 8h în {exportMonth}
                         </p>
                       </div>
                     )}
@@ -753,67 +544,54 @@ export default function Attendance() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-5 flex flex-col sm:flex-row items-center gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: "#f0fafa" }}>
-                <Download className="h-5 w-5" style={{ color: "#00b5b5" }} />
-              </div>
-              <div>
-                <p className="font-semibold text-slate-900 text-sm">Export Raport Complet</p>
-                <p className="text-xs text-slate-400">Descarca prezenta tuturor angajatilor</p>
-              </div>
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-5 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#f0fafa" }}>
+              <Download className="h-5 w-5" style={{ color: "#00b5b5" }} />
             </div>
-            <button onClick={exportPDF}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white"
+            <div className="flex-1">
+              <p className="font-semibold text-slate-900 text-sm">Export Raport Complet</p>
+              <p className="text-xs text-slate-400">Descarcă prezența tuturor angajaților</p>
+            </div>
+            <button onClick={exportPDF} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white"
               style={{ backgroundColor: "#00b5b5" }}>
-              <Download className="h-4 w-4" />
-              Descarca PDF
+              <Download className="h-4 w-4" /> Descarcă PDF
             </button>
           </div>
-        </React.Fragment>
+        </>
       )}
 
+      {/* Modal concediu */}
       {showLeaveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <Motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-bold text-slate-900">Cerere de concediu</h2>
-              <button onClick={() => setShowLeaveModal(false)}
-                className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
+              <button onClick={() => setShowLeaveModal(false)} className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-medium text-slate-600 mb-1.5 block">Tip concediu</label>
-                <select value={leaveForm.type}
-                  onChange={e => setLeaveForm({ ...leaveForm, type: e.target.value })}
+                <select value={leaveForm.type} onChange={e => setLeaveForm({ ...leaveForm, type: e.target.value })}
                   className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400">
-                  {LEAVE_TYPES.map(t => (
-                    <option key={t.id} value={t.id}>{t.label}</option>
-                  ))}
+                  {LEAVE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">Data inceput</label>
-                  <input type="date" value={leaveForm.start_date}
-                    onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value })}
+                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">Data început</label>
+                  <input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value })}
                     className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">Data sfarsit</label>
-                  <input type="date" value={leaveForm.end_date}
-                    onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
+                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">Data sfârșit</label>
+                  <input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
                     className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">Motiv (optional)</label>
-                <textarea value={leaveForm.reason}
-                  onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })}
+                <label className="text-xs font-medium text-slate-600 mb-1.5 block">Motiv (opțional)</label>
+                <textarea value={leaveForm.reason} onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })}
                   placeholder="Descrie pe scurt motivul..." rows={3}
                   className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-400" />
               </div>
@@ -821,13 +599,24 @@ export default function Attendance() {
             <div className="flex gap-3 mt-5">
               <button onClick={() => setShowLeaveModal(false)}
                 className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">
-                Anuleaza
+                Anulează
               </button>
-              <button onClick={handleLeaveSubmit}
-                disabled={!leaveForm.start_date || !leaveForm.end_date || createLeaveMutation.isPending}
+              <button onClick={() => {
+                if (!leaveForm.start_date || !leaveForm.end_date) return;
+                createLeave.mutate({
+                  employee_email: user?.email,
+                  employee_name: myEmployee?.full_name || user?.email,
+                  type: leaveForm.type,
+                  start_date: leaveForm.start_date,
+                  end_date: leaveForm.end_date,
+                  reason: leaveForm.reason,
+                  status: "pending",
+                });
+              }}
+                disabled={!leaveForm.start_date || !leaveForm.end_date || createLeave.isPending}
                 className="flex-1 py-2.5 rounded-xl text-white text-sm font-medium disabled:opacity-50"
                 style={{ backgroundColor: "#00b5b5" }}>
-                {createLeaveMutation.isPending ? "Se trimite..." : "Trimite cererea"}
+                {createLeave.isPending ? "Se trimite..." : "Trimite cererea"}
               </button>
             </div>
           </Motion.div>
