@@ -1,16 +1,17 @@
 import React, { useState } from "react";
 import { appClient } from "@/api/appClient";
-import { EMP_LIST, seedAttendance, seedMessages, seedTasks, seedClients, seedCalendar, seedRooms, seedMoodVotes } from "@/lib/seedData";
+import { EMP_LIST, seedAttendance, seedMessages, seedTasks, seedMoodVotes, seedLeaveRequests, seedClients, seedCalendar, seedRooms } from "@/lib/seedData";
 
 const BUTTONS = [
   { label: "👥 Angajați", fn: async () => { for (const emp of EMP_LIST) await appClient.entities.Employee.create(emp); } },
-  { label: "📅 Prezență (toate lunile)", fn: seedAttendance },
+  { label: "📅 Prezență mai 2026", fn: seedAttendance },
   { label: "💬 Mesaje", fn: seedMessages },
   { label: "✅ Sarcini", fn: seedTasks },
+  { label: "😊 Mood Votes", fn: seedMoodVotes },
+  { label: "📋 Cereri Concediu", fn: seedLeaveRequests },
   { label: "👤 Clienți", fn: seedClients },
   { label: "📆 Calendar", fn: seedCalendar },
   { label: "🏠 Săli", fn: seedRooms },
-  { label: "😊 Mood Votes", fn: seedMoodVotes },
 ];
 
 export default function SeedPage() {
@@ -22,6 +23,7 @@ export default function SeedPage() {
       await fn();
       setStatus(s => ({ ...s, [label]: "✅ Gata!" }));
     } catch (err) {
+      console.error(err);
       setStatus(s => ({ ...s, [label]: "❌ Eroare!" }));
     }
   };
@@ -29,7 +31,7 @@ export default function SeedPage() {
   return (
     <div className="max-w-lg mx-auto mt-10 bg-white rounded-2xl border border-slate-200/60 p-8 space-y-4">
       <h2 className="text-xl font-bold text-slate-900">🌱 Populare Date Demo</h2>
-      <p className="text-xs text-slate-400">Pagină internă - nu apare în meniu</p>
+      <p className="text-xs text-slate-400">Pagină internă — mai 2026</p>
       {BUTTONS.map(({ label, fn }) => (
         <div key={label} className="flex items-center gap-4">
           <button onClick={() => run(label, fn)}
@@ -37,7 +39,7 @@ export default function SeedPage() {
             style={{ backgroundColor: "#00b5b5" }}>
             {label}
           </button>
-          <span className="text-sm w-32">{status[label] || ""}</span>
+          <span className="text-sm w-28">{status[label] || ""}</span>
         </div>
       ))}
     </div>
