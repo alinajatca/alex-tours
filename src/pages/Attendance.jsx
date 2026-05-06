@@ -551,30 +551,34 @@ export default function Attendance() {
                     className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm" />
                 </div>
                 <div className="space-y-3">
-                  {employees.filter(e => e.status === "active").map(emp => {
-                    const empEvs = events.filter(ev => ev.employee_email === emp.email && ev.date?.startsWith(exportMonth));
-                    const empRecs = records.filter(r => r.employee_email === emp.email && r.date?.startsWith(exportMonth));
-                    const prez = empRecs.filter(r => r.status === "present").length;
-                    const abs = empRecs.filter(r => r.status === "absent").length;
-                    let totalMin = 0, otMin = 0;
-                    [...new Set(empEvs.map(e => e.date))].forEach(date => {
-                      const de = empEvs.filter(e => e.date === date).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
-                      let ci = null, bs = null, bt = 0, dt = 0;
-                      de.forEach(ev => {
-                        const t = ev.time?.split(":").map(Number);
-                        if (!t) return;
-                        const m = t[0] * 60 + t[1];
-                        if (ev.event_type === "check_in") ci = m;
-                        if (ev.event_type === "break_start" || ev.event_type === "meeting_start") bs = m;
-                        if ((ev.event_type === "break_end" || ev.event_type === "meeting_end") && bs) { bt += m - bs; bs = null; }
-                        if (ev.event_type === "check_out" && ci) dt = m - ci - bt;
-                      });
-                      totalMin += dt;
-                      if (dt > 480) otMin += dt - 480;
-                    });
-                    const ore = totalMin > 0 ? Math.floor(totalMin / 60) + "h" + (totalMin % 60 > 0 ? " " + totalMin % 60 + "min" : "") : "—";
-                    const ot = otMin > 0 ? Math.floor(otMin / 60) + "h" + (otMin % 60 > 0 ? " " + otMin % 60 + "min" : "") : null;
-                    const otZ = [...new Set(empEvs.map(e => e.date))].filter(d => calcOvertimeMin(empEvs.filter(e => e.date === d)) > 0).length;
+{employees.filter(e => e.status === "active").map(emp => {
+  const empEvs = events.filter(ev => ev.employee_email === emp.email && ev.date?.startsWith(exportMonth));
+  const empRecs = records.filter(r => r.employee_email === emp.email && r.date?.startsWith(exportMonth));
+  const prez = empRecs.filter(r => r.status === "present").length;
+  const abs = empRecs.filter(r => r.status === "absent").length;
+  let totalMin = 0, otMin = 0;
+  [...new Set(empEvs.map(e => e.date))].forEach(date => {
+    const de = empEvs.filter(e => e.date === date).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+    let ci = null, bs = null, bt = 0, dt = 0;
+    de.forEach(ev => {
+      const t = ev.time?.split(":").map(Number);
+      if (!t) return;
+      const m = t[0] * 60 + t[1];
+      if (ev.event_type === "check_in") ci = m;
+      if (ev.event_type === "break_start" || ev.event_type === "meeting_start") bs = m;
+      if ((ev.event_type === "break_end" || ev.event_type === "meeting_end") && bs) { bt += m - bs; bs = null; }
+      if (ev.event_type === "check_out" && ci) dt = m - ci - bt;
+    });
+    totalMin += dt;
+    if (dt > 480) otMin += dt - 480;
+  });
+  return { emp, empEvs, empRecs, prez, abs, totalMin, otMin };
+})
+.sort((a, b) => b.totalMin - a.totalMin)
+.map(({ emp, empEvs, empRecs, prez, abs, totalMin, otMin }) => {
+  const ore = totalMin > 0 ? Math.floor(totalMin / 60) + "h" + (totalMin % 60 > 0 ? " " + totalMin % 60 + "min" : "") : "—";
+  const ot = otMin > 0 ? Math.floor(otMin / 60) + "h" + (otMin % 60 > 0 ? " " + otMin % 60 + "min" : "") : null;
+  const otZ = [...new Set(empEvs.map(e => e.date))].filter(d => calcOvertimeMin(empEvs.filter(e => e.date === d)) > 0).length;
 
                     return (
                       <div key={emp.id} className="rounded-xl border border-slate-100 hover:border-slate-200 overflow-hidden">
@@ -623,7 +627,7 @@ export default function Attendance() {
                             autoTable(doc, {
                               startY: 120,
                               head: [["Data", "Check-in", "Check-out", "Ore", "Ore Supl.", "Locație", "Status"]],
-                              body: empRecs.map(r => {
+                              body: [...empRecs].sort((a, b) => (a.date || "").localeCompare(b.date || "")).map(r => {
                                 const de = empEvs.filter(e => e.date === r.date).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
                                 const co = de.find(e => e.event_type === "check_out")?.time || "—";
                                 const dh = calcHours(de) || "—";

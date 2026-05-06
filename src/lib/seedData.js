@@ -1,5 +1,7 @@
 import { appClient } from "@/api/appClient";
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 const EMPLOYEES = [
   { full_name: "Popescu Ion", email: "popescu.ion@alextours.ro", role: "tour_guide", department: "Operations", status: "active", current_status: "acasa", gender: "m", birth_date: "1990-04-20" },
   { full_name: "Ionescu Maria", email: "ionescu.maria@alextours.ro", role: "booking_agent", department: "Sales", status: "active", current_status: "acasa", gender: "f", birth_date: "1995-05-08" },
@@ -19,7 +21,6 @@ const EMPLOYEES = [
   { full_name: "Bucur Silviu", email: "bucur.silviu@alextours.ro", role: "operations", department: "Operations", status: "active", current_status: "acasa", gender: "m", birth_date: "1988-07-30" },
 ];
 
-// Primii 10 angajati cu date complete pentru mai 2026
 const MAY_SCHEDULE = [
   {
     email: "popescu.ion@alextours.ro", name: "Popescu Ion",
@@ -364,6 +365,7 @@ export const EMP_LIST = EMPLOYEES;
 export const seedAttendance = async () => {
   console.log("📅 Adăugare prezență mai 2026...");
   for (const emp of MAY_SCHEDULE) {
+    console.log(`⏳ Procesez ${emp.name}...`);
     for (const [date, data] of Object.entries(emp.days)) {
       if (data.absent) {
         await appClient.entities.Attendance.create({
@@ -374,6 +376,7 @@ export const seedAttendance = async () => {
           status: "absent",
           work_location: "acasa",
         });
+        await sleep(150);
       } else {
         await appClient.entities.Attendance.create({
           employee_email: emp.email,
@@ -383,18 +386,37 @@ export const seedAttendance = async () => {
           status: "present",
           work_location: data.loc,
         });
-        await appClient.entities.AttendanceEvent.create({ employee_email: emp.email, employee_name: emp.name, date, time: data.ci, event_type: "check_in" });
-        await appClient.entities.AttendanceEvent.create({ employee_email: emp.email, employee_name: emp.name, date, time: data.bs, event_type: "break_start" });
-        await appClient.entities.AttendanceEvent.create({ employee_email: emp.email, employee_name: emp.name, date, time: data.be, event_type: "break_end" });
-        await appClient.entities.AttendanceEvent.create({ employee_email: emp.email, employee_name: emp.name, date, time: data.co, event_type: "check_out" });
+        await sleep(150);
+        await appClient.entities.AttendanceEvent.create({
+          employee_email: emp.email, employee_name: emp.name,
+          date, time: data.ci, event_type: "check_in",
+        });
+        await sleep(150);
+        await appClient.entities.AttendanceEvent.create({
+          employee_email: emp.email, employee_name: emp.name,
+          date, time: data.bs, event_type: "break_start",
+        });
+        await sleep(150);
+        await appClient.entities.AttendanceEvent.create({
+          employee_email: emp.email, employee_name: emp.name,
+          date, time: data.be, event_type: "break_end",
+        });
+        await sleep(150);
+        await appClient.entities.AttendanceEvent.create({
+          employee_email: emp.email, employee_name: emp.name,
+          date, time: data.co, event_type: "check_out",
+        });
+        await sleep(150);
       }
     }
+    console.log(`✅ ${emp.name} gata!`);
+    await sleep(300);
   }
-  console.log("✅ Prezență gata!");
+  console.log("✅ Prezență completă!");
 };
 
 export const seedMessages = async () => {
-  console.log("💬 Adăugare mesaje mai 2026...");
+  console.log("💬 Adăugare mesaje...");
   for (const msg of MAY_MESSAGES) {
     await appClient.entities.Message.create({
       channel: msg.channel,
@@ -403,20 +425,22 @@ export const seedMessages = async () => {
       sender_email: msg.sender_email,
       content: msg.content,
     });
+    await sleep(100);
   }
   console.log("✅ Mesaje gata!");
 };
 
 export const seedTasks = async () => {
-  console.log("✅ Adăugare sarcini mai 2026...");
+  console.log("✅ Adăugare sarcini...");
   for (const task of MAY_TASKS) {
     await appClient.entities.Task.create(task);
+    await sleep(100);
   }
   console.log("✅ Sarcini gata!");
 };
 
 export const seedMoodVotes = async () => {
-  console.log("😊 Adăugare mood votes mai 2026...");
+  console.log("😊 Adăugare mood votes...");
   for (const weekData of MAY_MOOD) {
     const moods = MOOD_DATA[weekData.date];
     for (let i = 0; i < ALL_EMPLOYEES_EMAILS.length; i++) {
@@ -427,6 +451,7 @@ export const seedMoodVotes = async () => {
         week: weekData.week,
         date: weekData.date,
       });
+      await sleep(100);
     }
   }
   console.log("✅ Mood votes gata!");
@@ -436,6 +461,7 @@ export const seedLeaveRequests = async () => {
   console.log("📋 Adăugare cereri concediu...");
   for (const leave of LEAVE_DATA) {
     await appClient.entities.LeaveRequest.create(leave);
+    await sleep(100);
   }
   console.log("✅ Cereri concediu gata!");
 };
@@ -461,9 +487,12 @@ export const seedClients = async () => {
     { full_name: "Popescu Catalin", email: "popescu.catalin@yahoo.com", phone: "0786789012", city: "Arad", status: "activ", last_tour: "Italia 2026", tours_count: "3", notes: "Preferă hoteluri boutique" },
     { full_name: "Niculae Maria", email: "niculae.maria@gmail.com", phone: "0797890123", city: "Pitești", status: "prospect", last_tour: "", tours_count: "0", notes: "Interesat de Japonia" },
     { full_name: "Constantin Victor", email: "constantin.victor@gmail.com", phone: "0764567890", city: "Craiova", status: "activ", last_tour: "Grecia 2026", tours_count: "4", notes: "Rezervă mereu cu familia" },
-    { full_name: "Barbu Sorin", email: "barbu2.sorin@gmail.com", phone: "0708901235", city: "Iași", status: "activ", last_tour: "Dubai 2026", tours_count: "2", notes: "Client nou recomandat" },
+    { full_name: "Barbu Sorin 2", email: "barbu2.sorin@gmail.com", phone: "0708901235", city: "Iași", status: "activ", last_tour: "Dubai 2026", tours_count: "2", notes: "Client nou recomandat" },
   ];
-  for (const client of CLIENTS) await appClient.entities.Client.create(client);
+  for (const client of CLIENTS) {
+    await appClient.entities.Client.create(client);
+    await sleep(100);
+  }
   console.log("✅ Clienți gata!");
 };
 
@@ -480,7 +509,10 @@ export const seedCalendar = async () => {
     { title: "Evaluare performanță Q1", date: "2026-05-28", time: "09:00", duration: "240", description: "Evaluare individuală toți angajații - sesiuni de 15 minute", color: "red", created_by_name: "Alina" },
     { title: "Team building online", date: "2026-05-29", time: "17:00", duration: "90", description: "Activitate de echipă - trivia și jocuri virtuale 🎮", color: "green", created_by_name: "Alina" },
   ];
-  for (const event of EVENTS) await appClient.entities.CalendarEvent.create(event);
+  for (const event of EVENTS) {
+    await appClient.entities.CalendarEvent.create(event);
+    await sleep(100);
+  }
   console.log("✅ Calendar gata!");
 };
 
@@ -491,14 +523,20 @@ export const seedRooms = async () => {
     { name: "Sala Training", description: "Sesiuni de training și onboarding", meeting_url: "https://meet.google.com/uvw-xyz-123", topic: "Training angajați", status: "available", current_participants: 0, scheduled_by_name: "Alina" },
     { name: "Sala Marketing", description: "Brainstorming și campanii", meeting_url: "https://meet.google.com/mkt-room-456", topic: "Strategie marketing", status: "available", current_participants: 0, scheduled_by_name: "Alina" },
   ];
-  for (const room of ROOMS) await appClient.entities.Room.create(room);
+  for (const room of ROOMS) {
+    await appClient.entities.Room.create(room);
+    await sleep(100);
+  }
   console.log("✅ Săli gata!");
 };
 
 export const seedDatabase = async () => {
   console.log("🌱 Populare completă...");
   try {
-    for (const emp of EMPLOYEES) await appClient.entities.Employee.create(emp);
+    for (const emp of EMPLOYEES) {
+      await appClient.entities.Employee.create(emp);
+      await sleep(100);
+    }
     await seedAttendance();
     await seedMessages();
     await seedTasks();
