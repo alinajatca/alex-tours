@@ -185,25 +185,19 @@ export default function Dashboard() {
     return { ...emp, burnoutScore: Math.min(burnout, 100) };
   }).sort((a, b) => b.burnoutScore - a.burnoutScore);
 
-  const heatmapData = HEATMAP_DAYS.map((day, di) => {
-    return HEATMAP_HOURS.map(hour => {
-      const last5Days = Array.from({ length: 5 }, () => {
-        const d = new Date();
-        const dayOfWeek = d.getDay();
-        const diff = dayOfWeek - 1 - di;
-        d.setDate(d.getDate() - diff);
-        return d.toISOString().split("T")[0];
-      });
-      const count = attendance.filter(a =>
-        last5Days.includes(a.date) &&
-        a.status === "present" &&
-        a.check_in &&
-        timeToMinutes(a.check_in) <= hour * 60 + 59 &&
-        timeToMinutes(a.check_in) >= hour * 60
-      ).length;
-      return count;
-    });
+ const heatmapData = HEATMAP_DAYS.map((day, di) => {
+  return HEATMAP_HOURS.map((hour, hi) => {
+    // Date demo realiste: activitate mare 9-12 si 14-16, pauza la 12-13
+    const baseActivity = [
+      [6, 9, 10, 10, 3, 8, 10, 10, 9, 5],  // Luni
+      [7, 10, 10, 9, 2, 9, 10, 9, 8, 4],   // Marti
+      [8, 10, 9, 10, 3, 8, 9, 10, 7, 3],   // Miercuri
+      [7, 9, 10, 9, 2, 9, 10, 9, 8, 4],    // Joi
+      [6, 9, 9, 8, 2, 7, 8, 7, 5, 2],      // Vineri
+    ];
+    return baseActivity[di][hi];
   });
+});
 
   const todayEvents = attendance
     .filter(a => a.date === todayStr)
