@@ -932,12 +932,22 @@ export default function Attendance() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1.5 block">Data început</label>
-                  <input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value })}
+                  <input type="date" value={leaveForm.start_date}
+  onChange={e => {
+    const newStart = e.target.value;
+    setLeaveForm({ 
+      ...leaveForm, 
+      start_date: newStart,
+      end_date: leaveForm.end_date && leaveForm.end_date < newStart ? newStart : leaveForm.end_date
+    });
+  }}
                     className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1.5 block">Data sfârșit</label>
-                  <input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
+                  <input type="date" value={leaveForm.end_date} 
+  min={leaveForm.start_date || undefined}
+  onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
                     className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
                 </div>
               </div>
