@@ -62,7 +62,7 @@ export default function AIInsights({ employees, tasks, attendance, user }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
       }),
@@ -170,7 +170,7 @@ Răspunde întotdeauna în limba română, profesionist și concis.`;
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
           max_tokens: 1000,
           system: systemContext,
           messages: newHistory,

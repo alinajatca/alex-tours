@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { appClient } from "@/api/appClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { FolderOpen, FileText, Image, File, Trash2, Download, Upload, Plus } from "lucide-react";
+import { FolderOpen, FileText, Image, File, Trash2, Download, Upload, Plus, Eye } from "lucide-react";
 import { AnimatePresence, motion as Motion } from "framer-motion";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/AuthContext";
@@ -23,8 +23,8 @@ const getFileIcon = (name) => {
 const formatSize = (bytes) => {
   if (!bytes) return "";
   const b = parseInt(bytes);
-  if (b > 1024*1024) return `${(b/1024/1024).toFixed(1)} MB`;
-  if (b > 1024) return `${(b/1024).toFixed(0)} KB`;
+  if (b > 1024 * 1024) return `${(b / 1024 / 1024).toFixed(1)} MB`;
+  if (b > 1024) return `${(b / 1024).toFixed(0)} KB`;
   return `${b} B`;
 };
 
@@ -33,6 +33,7 @@ export default function Files() {
   const [activeFolder, setActiveFolder] = useState("General");
   const [uploading, setUploading] = useState(false);
   const [description, setDescription] = useState("");
+  const [previewFile, setPreviewFile] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: files = [], isLoading } = useQuery({
@@ -59,8 +60,11 @@ export default function Files() {
       formData.append("file", file);
       formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
+      const isImage = file.type.startsWith("image/");
+      const uploadType = isImage ? "image" : "raw";
+
       const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/raw/upload`,
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${uploadType}/upload`,
         { method: "POST", body: formData }
       );
       const data = await res.json();
@@ -90,72 +94,172 @@ export default function Files() {
     setUploading(false);
   };
 
-  const folderFiles = files.filter(f => f.folder === activeFolder);
+  const folderFiles = files.filter((f) => f.folder === activeFolder);
+
+  const isImage = (file) => {
+    const ext = file.file_name?.split(".").pop()?.toLowerCase();
+    return file.file_type?.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
+  };
+
+  const isPDF = (file) => {
+    const ext = file.file_name?.split(".").pop()?.toLowerCase();
+    return file.file_type === "application/pdf" || ext === "pdf";
+  };
 
   return (
     <div className="flex gap-6 h-[calc(100vh-140px)]">
+      {/* Sidebar foldere */}
       <div className="w-48 flex-shrink-0 bg-white rounded-2xl border border-slate-200/60 p-3 flex flex-col gap-1 h-fit">
-        <p className="text-xs font-semibold text-slate-400 px-2 py-1 uppercase tracking-wider">Folders</p>
-        {FOLDERS.map(f => (
-          <button key={f} onClick={() => setActiveFolder(f)}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${activeFolder === f ? "bg-amber-500 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
+        <p className="text-xs font-semibold text-slate-400 px-2 py-1 uppercase tracking-wider">
+          Foldere
+        </p>
+        {FOLDERS.map((f) => (
+          <button
+            key={f}
+            onClick={() => setActiveFolder(f)}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+              activeFolder === f ? "text-white" : "text-slate-600 hover:bg-slate-50"
+            }`}
+            style={activeFolder === f ? { backgroundColor: "#f59e0b" } : {}}
+          >
             <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
             {f}
-            <span className={`ml-auto text-xs rounded-full px-1.5 ${activeFolder === f ? "bg-white/20 text-white" : "bg-slate-100 text-slate-400"}`}>
-              {files.filter(fi => fi.folder === f).length}
+            <span
+              className={`ml-auto text-xs rounded-full px-1.5 ${
+                activeFolder === f ? "bg-white/20 text-white" : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              {files.filter((fi) => fi.folder === f).length}
             </span>
           </button>
         ))}
       </div>
 
+      {/* Continut principal */}
       <div className="flex-1 flex flex-col gap-4 min-w-0">
+        {/* Upload zone */}
         <div className="bg-white rounded-2xl border border-dashed border-amber-300 p-5 flex flex-col sm:flex-row items-center gap-4">
           <div className="h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
             <Upload className="h-5 w-5 text-amber-500" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-slate-900 text-sm">Upload în <span className="text-amber-600">{activeFolder}</span></p>
-            <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Descriere opțională..." className="mt-2 h-8 text-xs" />
+            <p className="font-semibold text-slate-900 text-sm">
+              Upload în <span className="text-amber-600">{activeFolder}</span>
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              PDF, Word, Excel, imagini și altele
+            </p>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descriere opțională..."
+              className="mt-2 h-8 text-xs"
+            />
           </div>
-          <label className={`cursor-pointer flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-white ${uploading ? "bg-amber-300 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600"} transition-colors`}>
-            {uploading ? "Se încarcă..." : <><Plus className="h-4 w-4" />Upload Fișier</>}
-            <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
+          <label
+            className={`cursor-pointer flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors ${
+              uploading ? "opacity-60 cursor-not-allowed" : "hover:opacity-90"
+            }`}
+            style={{ backgroundColor: "#f59e0b" }}
+          >
+            {uploading ? (
+              "Se încarcă..."
+            ) : (
+              <>
+                <Plus className="h-4 w-4" />
+                Upload Fișier
+              </>
+            )}
+            <input
+              type="file"
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploading}
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif,.webp,.svg"
+            />
           </label>
         </div>
 
+        {/* Lista fisiere */}
         <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden flex-1 overflow-y-auto">
           {isLoading ? (
-            <div className="p-8 space-y-3">{[1,2,3].map(i => <div key={i} className="h-14 bg-slate-100 animate-pulse rounded-xl" />)}</div>
+            <div className="p-8 space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-14 bg-slate-100 animate-pulse rounded-xl" />
+              ))}
+            </div>
           ) : folderFiles.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
               <FolderOpen className="h-12 w-12 mb-3 opacity-30" />
               <p className="text-sm">Nu există fișiere în {activeFolder}</p>
+              <p className="text-xs mt-1 opacity-60">Uploadează primul fișier</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-50">
               <AnimatePresence>
                 {folderFiles.map((file, i) => {
                   const Icon = getFileIcon(file.file_name);
+                  const canPreview = isImage(file) || isPDF(file);
                   return (
-                    <Motion.div key={file.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.04 }}
-                      className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/50 group transition-colors">
+                    <Motion.div
+                      key={file.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: i * 0.04 }}
+                      className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/50 group transition-colors"
+                    >
                       <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
                         <Icon className="h-5 w-5 text-slate-500" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">{file.file_name}</p>
-                        <p className="text-xs text-slate-400">
-                          {file.uploaded_by_name} · {file.created_date ? format(new Date(file.created_date), "MMM d, yyyy") : ""} {file.file_size ? `· ${formatSize(file.file_size)}` : ""}
+                        <p className="text-sm font-medium text-slate-900 truncate">
+                          {file.file_name}
                         </p>
-                        {file.description && <p className="text-xs text-slate-400 italic">{file.description}</p>}
+                        <p className="text-xs text-slate-400">
+                          {file.uploaded_by_name}
+                          {file.created_date
+                            ? ` · ${format(new Date(file.created_date), "d MMM yyyy")}`
+                            : ""}
+                          {file.file_size ? ` · ${formatSize(file.file_size)}` : ""}
+                        </p>
+                        {file.description && (
+                          <p className="text-xs text-slate-400 italic">
+                            {file.description}
+                          </p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* Buton previzualizare */}
+                        {canPreview && (
+                          <button
+                            onClick={() => setPreviewFile(file)}
+                            className="p-2 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-500 transition-colors"
+                            title="Deschide"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        )}
+                        {/* Buton download */}
                         {file.file_url && (
-                          <a href={file.file_url} target="_blank" rel="noreferrer" download className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                          <a
+                            href={file.file_url}
+                            download={file.file_name}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                            title="Descarcă"
+                          >
                             <Download className="h-4 w-4" />
                           </a>
                         )}
-                        <button onClick={() => { if(confirm("Ștergi fișierul?")) deleteMutation.mutate(file.id); }} className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                        {/* Buton stergere */}
+                        <button
+                          onClick={() => {
+                            if (confirm("Ștergi fișierul?")) deleteMutation.mutate(file.id);
+                          }}
+                          className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                          title="Șterge"
+                        >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -167,6 +271,105 @@ export default function Files() {
           )}
         </div>
       </div>
+
+      {/* Modal previzualizare */}
+      {previewFile && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setPreviewFile(null)}
+        >
+          <Motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header modal */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-8 w-8 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-4 w-4 text-amber-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 truncate">
+                    {previewFile.file_name}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {formatSize(previewFile.file_size)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <a
+                  href={previewFile.file_url}
+                  download={previewFile.file_name}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
+                  style={{ backgroundColor: "#f59e0b" }}
+                >
+                  <Download className="h-3.5 w-3.5" /> Descarcă
+                </a>
+                <button
+                  onClick={() => setPreviewFile(null)}
+                  className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 text-lg font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Continut previzualizare */}
+            <div className="flex-1 overflow-hidden bg-slate-50">
+              {isImage(previewFile) ? (
+                <div className="h-full flex items-center justify-center p-4">
+                  <img
+                    src={previewFile.file_url}
+                    alt={previewFile.file_name}
+                    className="max-w-full max-h-full object-contain rounded-lg"
+                  />
+                </div>
+              ) : isPDF(previewFile) ? (
+                <object
+                  data={previewFile.file_url}
+                  type="application/pdf"
+                  className="w-full h-full min-h-[600px]"
+                >
+                  <iframe
+                    src={previewFile.file_url}
+                    className="w-full h-full min-h-[600px]"
+                    title={previewFile.file_name}
+                    style={{ border: "none" }}
+                  >
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center">
+                      <FileText className="h-12 w-12 mb-3 opacity-30" />
+                      <p className="text-sm">Browserul tău nu suportă vizualizarea directă a PDF-urilor.</p>
+                      <a href={previewFile.file_url} download target="_blank" rel="noreferrer"
+                         className="mt-3 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white"
+                         style={{ backgroundColor: "#f59e0b" }}>
+                        Descarcă PDF-ul pentru a-l citi
+                      </a>
+                    </div>
+                  </iframe>
+                </object>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                  <FileText className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-sm">Previzualizare indisponibilă</p>
+                  <a
+                    href={previewFile.file_url}
+                    download={previewFile.file_name}
+                    className="mt-3 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white"
+                    style={{ backgroundColor: "#f59e0b" }}
+                  >
+                    <Download className="h-4 w-4" /> Descarcă fișierul
+                  </a>
+                </div>
+              )}
+            </div>
+          </Motion.div>
+        </div>
+      )}
     </div>
   );
 }
