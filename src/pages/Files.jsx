@@ -56,13 +56,15 @@ export default function Files() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+
     try {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
-      // PDF si documente -> /raw/upload, imagini -> /image/upload
       const isImage = file.type.startsWith("image/");
+
+      // Imagini -> /image/upload, orice altceva (PDF, doc etc) -> /raw/upload
       const uploadType = isImage ? "image" : "raw";
 
       const res = await fetch(
@@ -78,9 +80,15 @@ export default function Files() {
         return;
       }
 
+      // FIX 401: transforma URL-ul raw in unul accesibil public
+      let fileUrl = data.secure_url;
+      if (fileUrl.includes("/raw/upload/")) {
+        fileUrl = fileUrl.replace("/raw/upload/", "/raw/upload/fl_attachment:false/");
+      }
+
       await createMutation.mutateAsync({
         file_name: file.name,
-        file_url: data.secure_url,
+        file_url: fileUrl,
         file_type: file.type,
         file_size: String(file.size),
         uploaded_by_name: user?.full_name || user?.email,
@@ -88,7 +96,10 @@ export default function Files() {
         folder: activeFolder,
         description: description || "",
       });
+
       setDescription("");
+      // Reset input
+      e.target.value = "";
     } catch (err) {
       console.error("Upload failed:", err);
       alert("Upload eșuat!");
@@ -98,24 +109,36 @@ export default function Files() {
 
   const folderFiles = files.filter((f) => f.folder === activeFolder);
 
-  const isImage = (file) => {
+  const isImageFile = (file) => {
     const ext = file.file_name?.split(".").pop()?.toLowerCase();
     return file.file_type?.startsWith("image/") || ["jpg","jpeg","png","gif","webp","svg"].includes(ext);
   };
 
-  const isPDF = (file) => {
+  const isPDFFile = (file) => {
     const ext = file.file_name?.split(".").pop()?.toLowerCase();
     return file.file_type === "application/pdf" || ext === "pdf";
   };
 
-  const isDoc = (file) => {
+  const isDocFile = (file) => {
     const ext = file.file_name?.split(".").pop()?.toLowerCase();
     return ["doc","docx","xls","xlsx","ppt","pptx"].includes(ext);
   };
 
-  // URL pentru Google Docs Viewer - functioneaza cu orice URL public
-  const getGoogleViewerUrl = (url) =>
+  // Google Docs Viewer pentru PDF si documente
+  const getViewerUrl = (url) =>
     `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+
+  // Download fortat pentru fisiere
+  const handleDownload = (file) => {
+    const a = document.createElement("a");
+    a.href = file.file_url;
+    a.download = file.file_name || "fisier";
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
   const openPreview = (file) => {
     setIframeLoading(true);
@@ -155,15 +178,27 @@ export default function Files() {
             <p className="font-semibold text-slate-900 text-sm">
               Upload în <span className="text-amber-600">{activeFolder}</span>
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">PDF, Word, Excel, imagini și altele</p>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descriere opțională..." className="mt-2 h-8 text-xs" />
+            <p className="text-xs text-slate-400 mt-0.5">PDF, Word, Excel, imagini și altele (max 10MB)</p>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descriere opțională..."
+              className="mt-2 h-8 text-xs"
+            />
           </div>
           <label className={`cursor-pointer flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors ${uploading ? "opacity-60 cursor-not-allowed" : "hover:opacity-90"}`}
             style={{ backgroundColor: "#f59e0b" }}>
-            {uploading ? "Se încarcă..." : <><Plus className="h-4 w-4" />Upload Fișier</>}
-            <input type="file" className="hidden" onChange={handleUpload} disabled={uploading}
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif,.webp,.svg" />
+            {uploading
+              ? <><span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Se încarcă...</>
+              : <><Plus className="h-4 w-4" />Upload Fișier</>
+            }
+            <input
+              type="file"
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploading}
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif,.webp,.svg"
+            />
           </label>
         </div>
 
@@ -171,22 +206,27 @@ export default function Files() {
         <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="p-8 space-y-3">
-              {[1, 2, 3].map((i) => <div key={i} className="h-14 bg-slate-100 animate-pulse rounded-xl" />)}
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-14 bg-slate-100 animate-pulse rounded-xl" />
+              ))}
             </div>
           ) : folderFiles.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
               <FolderOpen className="h-12 w-12 mb-3 opacity-30" />
               <p className="text-sm">Nu există fișiere în {activeFolder}</p>
-              <p className="text-xs mt-1 opacity-60">Uploadează primul fișier</p>
+              <p className="text-xs mt-1 opacity-60">Uploadează primul fișier folosind butonul de mai sus</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-50">
               <AnimatePresence>
                 {folderFiles.map((file, i) => {
                   const Icon = getFileIcon(file.file_name);
-                  const canPreview = isImage(file) || isPDF(file) || isDoc(file);
+                  const canPreview = isImageFile(file) || isPDFFile(file) || isDocFile(file);
                   return (
-                    <Motion.div key={file.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                    <Motion.div
+                      key={file.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.04 }}
                       className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/50 group transition-colors">
                       <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
@@ -199,24 +239,27 @@ export default function Files() {
                           {file.created_date ? ` · ${format(new Date(file.created_date), "d MMM yyyy")}` : ""}
                           {file.file_size ? ` · ${formatSize(file.file_size)}` : ""}
                         </p>
-                        {file.description && <p className="text-xs text-slate-400 italic">{file.description}</p>}
+                        {file.description && (
+                          <p className="text-xs text-slate-400 italic mt-0.5">{file.description}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         {canPreview && (
-                          <button onClick={() => openPreview(file)}
+                          <button
+                            onClick={() => openPreview(file)}
                             className="p-2 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-500 transition-colors"
                             title="Previzualizează">
                             <Eye className="h-4 w-4" />
                           </button>
                         )}
-                        {file.file_url && (
-                          <a href={file.file_url} download={file.file_name} target="_blank" rel="noreferrer"
-                            className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                            title="Descarcă">
-                            <Download className="h-4 w-4" />
-                          </a>
-                        )}
-                        <button onClick={() => { if (confirm("Ștergi fișierul?")) deleteMutation.mutate(file.id); }}
+                        <button
+                          onClick={() => handleDownload(file)}
+                          className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                          title="Descarcă">
+                          <Download className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => { if (confirm("Ștergi fișierul?")) deleteMutation.mutate(file.id); }}
                           className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
                           title="Șterge">
                           <Trash2 className="h-4 w-4" />
@@ -233,9 +276,12 @@ export default function Files() {
 
       {/* Modal previzualizare */}
       {previewFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onClick={() => setPreviewFile(null)}>
-          <Motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+          <Motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}>
 
@@ -251,51 +297,57 @@ export default function Files() {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <a href={previewFile.file_url} download={previewFile.file_name} target="_blank" rel="noreferrer"
+                <button
+                  onClick={() => handleDownload(previewFile)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
                   style={{ backgroundColor: "#f59e0b" }}>
                   <Download className="h-3.5 w-3.5" /> Descarcă
-                </a>
-                <button onClick={() => setPreviewFile(null)}
-                  className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 text-lg font-bold">
+                </button>
+                <button
+                  onClick={() => setPreviewFile(null)}
+                  className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 font-bold text-lg">
                   ✕
                 </button>
               </div>
             </div>
 
             {/* Continut previzualizare */}
-            <div className="flex-1 overflow-hidden bg-slate-50 relative">
-              {isImage(previewFile) ? (
+            <div className="flex-1 overflow-hidden bg-slate-50 relative" style={{ minHeight: "500px" }}>
+              {isImageFile(previewFile) ? (
                 <div className="h-full flex items-center justify-center p-4">
-                  <img src={previewFile.file_url} alt={previewFile.file_name}
-                    className="max-w-full max-h-full object-contain rounded-lg" />
+                  <img
+                    src={previewFile.file_url}
+                    alt={previewFile.file_name}
+                    className="max-w-full max-h-full object-contain rounded-lg"
+                  />
                 </div>
-              ) : (isPDF(previewFile) || isDoc(previewFile)) ? (
+              ) : (isPDFFile(previewFile) || isDocFile(previewFile)) ? (
                 <>
                   {iframeLoading && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10">
                       <div className="h-8 w-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mb-3" />
-                      <p className="text-sm text-slate-400">Se încarcă previzualizarea...</p>
-                      <p className="text-xs text-slate-300 mt-1">Poate dura câteva secunde</p>
+                      <p className="text-sm text-slate-500">Se încarcă previzualizarea...</p>
+                      <p className="text-xs text-slate-400 mt-1">Poate dura câteva secunde</p>
                     </div>
                   )}
                   <iframe
-                    src={getGoogleViewerUrl(previewFile.file_url)}
-                    className="w-full h-full min-h-[600px]"
+                    src={getViewerUrl(previewFile.file_url)}
+                    className="w-full h-full"
+                    style={{ border: "none", minHeight: "500px" }}
                     title={previewFile.file_name}
-                    style={{ border: "none" }}
                     onLoad={() => setIframeLoading(false)}
                   />
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-slate-400">
                   <FileText className="h-12 w-12 mb-3 opacity-30" />
-                  <p className="text-sm">Previzualizare indisponibilă</p>
-                  <a href={previewFile.file_url} download={previewFile.file_name}
+                  <p className="text-sm">Previzualizare indisponibilă pentru acest tip de fișier</p>
+                  <button
+                    onClick={() => handleDownload(previewFile)}
                     className="mt-3 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white"
                     style={{ backgroundColor: "#f59e0b" }}>
                     <Download className="h-4 w-4" /> Descarcă fișierul
-                  </a>
+                  </button>
                 </div>
               )}
             </div>
