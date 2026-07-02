@@ -40,7 +40,22 @@ export default function Rooms() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["rooms"] }),
   });
 
+  const openMeetLink = (url) => {
+    const link = url || "https://meet.google.com/new";
+    const a = document.createElement("a");
+    a.href = link;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const handleJoin = (room) => {
+    // Deschide link-ul IMEDIAT sincron, inainte de orice await
+    openMeetLink(room.meeting_url);
+
+    // Actualizeaza participantii in fundal
     const participants = room.current_participants || [];
     if (!participants.includes(user?.email)) {
       updateMutation.mutate({
@@ -48,7 +63,6 @@ export default function Rooms() {
         data: { status: "in_use", current_participants: [...participants, user?.email] },
       });
     }
-    if (room.meeting_url) window.open(room.meeting_url, "_blank");
   };
 
   const handleLeave = (room) => {
@@ -95,7 +109,7 @@ export default function Rooms() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-slate-500">Link video (Zoom / Meet)</Label>
-              <Input value={form.meeting_url} onChange={e => setForm({ ...form, meeting_url: e.target.value })} placeholder="https://..." />
+              <Input value={form.meeting_url} onChange={e => setForm({ ...form, meeting_url: e.target.value })} placeholder="https://meet.google.com/..." />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-slate-500">Descriere</Label>
@@ -121,6 +135,7 @@ export default function Rooms() {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.05 }}
               className={`bg-white rounded-2xl border-2 p-5 transition-all duration-300 ${room.status === "in_use" ? "border-teal-300 shadow-lg shadow-teal-100" : "border-slate-200/60"}`}>
+
               <div className="flex items-start justify-between mb-3">
                 <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${room.status === "in_use" ? "bg-teal-50" : "bg-slate-100"}`}>
                   <Video className={`h-5 w-5 ${room.status === "in_use" ? "text-teal-500" : "text-slate-400"}`} />
@@ -138,15 +153,25 @@ export default function Rooms() {
                   )}
                 </div>
               </div>
+
               <h3 className="font-bold text-slate-900">{room.name}</h3>
               {room.topic && <p className="text-xs font-medium mt-0.5" style={{ color: "#00b5b5" }}>{room.topic}</p>}
               {room.description && <p className="text-sm text-slate-400 mt-1">{room.description}</p>}
+
               {(room.current_participants || []).length > 0 && (
                 <div className="flex items-center gap-2 mt-3 text-xs text-slate-500">
                   <Users className="h-3.5 w-3.5" />
                   {room.current_participants.length} {room.current_participants.length === 1 ? "participant" : "participanți"}
                 </div>
               )}
+
+              {/* Mesaj daca sala nu are link */}
+              {!room.meeting_url && (
+                <p className="text-xs text-amber-500 mt-2 flex items-center gap-1">
+                  ⚠ Se va deschide o întâlnire Google Meet nouă
+                </p>
+              )}
+
               <div className="flex gap-2 mt-4">
                 {inRoom(room) ? (
                   <Button size="sm" variant="outline"
@@ -163,7 +188,8 @@ export default function Rooms() {
                 )}
                 {room.meeting_url && (
                   <Button size="sm" variant="outline" className="text-xs px-2"
-                    onClick={() => window.open(room.meeting_url, "_blank")}>
+                    title="Deschide link direct"
+                    onClick={() => openMeetLink(room.meeting_url)}>
                     <ExternalLink className="h-3.5 w-3.5" />
                   </Button>
                 )}

@@ -34,6 +34,7 @@ export default function Files() {
   const [uploading, setUploading] = useState(false);
   const [description, setDescription] = useState("");
   const [previewFile, setPreviewFile] = useState(null);
+  const [iframeLoading, setIframeLoading] = useState(true);
   const queryClient = useQueryClient();
 
   const { data: files = [], isLoading } = useQuery({
@@ -60,6 +61,7 @@ export default function Files() {
       formData.append("file", file);
       formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
+      // PDF si documente -> /raw/upload, imagini -> /image/upload
       const isImage = file.type.startsWith("image/");
       const uploadType = isImage ? "image" : "raw";
 
@@ -98,7 +100,7 @@ export default function Files() {
 
   const isImage = (file) => {
     const ext = file.file_name?.split(".").pop()?.toLowerCase();
-    return file.file_type?.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
+    return file.file_type?.startsWith("image/") || ["jpg","jpeg","png","gif","webp","svg"].includes(ext);
   };
 
   const isPDF = (file) => {
@@ -106,29 +108,35 @@ export default function Files() {
     return file.file_type === "application/pdf" || ext === "pdf";
   };
 
+  const isDoc = (file) => {
+    const ext = file.file_name?.split(".").pop()?.toLowerCase();
+    return ["doc","docx","xls","xlsx","ppt","pptx"].includes(ext);
+  };
+
+  // URL pentru Google Docs Viewer - functioneaza cu orice URL public
+  const getGoogleViewerUrl = (url) =>
+    `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+
+  const openPreview = (file) => {
+    setIframeLoading(true);
+    setPreviewFile(file);
+  };
+
   return (
     <div className="flex gap-6 h-[calc(100vh-140px)]">
+
       {/* Sidebar foldere */}
       <div className="w-48 flex-shrink-0 bg-white rounded-2xl border border-slate-200/60 p-3 flex flex-col gap-1 h-fit">
         <p className="text-xs font-semibold text-slate-400 px-2 py-1 uppercase tracking-wider">
           Foldere
         </p>
         {FOLDERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => setActiveFolder(f)}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-              activeFolder === f ? "text-white" : "text-slate-600 hover:bg-slate-50"
-            }`}
-            style={activeFolder === f ? { backgroundColor: "#f59e0b" } : {}}
-          >
+          <button key={f} onClick={() => setActiveFolder(f)}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${activeFolder === f ? "text-white" : "text-slate-600 hover:bg-slate-50"}`}
+            style={activeFolder === f ? { backgroundColor: "#f59e0b" } : {}}>
             <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
             {f}
-            <span
-              className={`ml-auto text-xs rounded-full px-1.5 ${
-                activeFolder === f ? "bg-white/20 text-white" : "bg-slate-100 text-slate-400"
-              }`}
-            >
+            <span className={`ml-auto text-xs rounded-full px-1.5 ${activeFolder === f ? "bg-white/20 text-white" : "bg-slate-100 text-slate-400"}`}>
               {files.filter((fi) => fi.folder === f).length}
             </span>
           </button>
@@ -137,6 +145,7 @@ export default function Files() {
 
       {/* Continut principal */}
       <div className="flex-1 flex flex-col gap-4 min-w-0">
+
         {/* Upload zone */}
         <div className="bg-white rounded-2xl border border-dashed border-amber-300 p-5 flex flex-col sm:flex-row items-center gap-4">
           <div className="h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
@@ -146,37 +155,15 @@ export default function Files() {
             <p className="font-semibold text-slate-900 text-sm">
               Upload în <span className="text-amber-600">{activeFolder}</span>
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">
-              PDF, Word, Excel, imagini și altele
-            </p>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descriere opțională..."
-              className="mt-2 h-8 text-xs"
-            />
+            <p className="text-xs text-slate-400 mt-0.5">PDF, Word, Excel, imagini și altele</p>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descriere opțională..." className="mt-2 h-8 text-xs" />
           </div>
-          <label
-            className={`cursor-pointer flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors ${
-              uploading ? "opacity-60 cursor-not-allowed" : "hover:opacity-90"
-            }`}
-            style={{ backgroundColor: "#f59e0b" }}
-          >
-            {uploading ? (
-              "Se încarcă..."
-            ) : (
-              <>
-                <Plus className="h-4 w-4" />
-                Upload Fișier
-              </>
-            )}
-            <input
-              type="file"
-              className="hidden"
-              onChange={handleUpload}
-              disabled={uploading}
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif,.webp,.svg"
-            />
+          <label className={`cursor-pointer flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors ${uploading ? "opacity-60 cursor-not-allowed" : "hover:opacity-90"}`}
+            style={{ backgroundColor: "#f59e0b" }}>
+            {uploading ? "Se încarcă..." : <><Plus className="h-4 w-4" />Upload Fișier</>}
+            <input type="file" className="hidden" onChange={handleUpload} disabled={uploading}
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif,.webp,.svg" />
           </label>
         </div>
 
@@ -184,9 +171,7 @@ export default function Files() {
         <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="p-8 space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-14 bg-slate-100 animate-pulse rounded-xl" />
-              ))}
+              {[1, 2, 3].map((i) => <div key={i} className="h-14 bg-slate-100 animate-pulse rounded-xl" />)}
             </div>
           ) : folderFiles.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
@@ -199,67 +184,41 @@ export default function Files() {
               <AnimatePresence>
                 {folderFiles.map((file, i) => {
                   const Icon = getFileIcon(file.file_name);
-                  const canPreview = isImage(file) || isPDF(file);
+                  const canPreview = isImage(file) || isPDF(file) || isDoc(file);
                   return (
-                    <Motion.div
-                      key={file.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
+                    <Motion.div key={file.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.04 }}
-                      className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/50 group transition-colors"
-                    >
+                      className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/50 group transition-colors">
                       <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
                         <Icon className="h-5 w-5 text-slate-500" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">
-                          {file.file_name}
-                        </p>
+                        <p className="text-sm font-medium text-slate-900 truncate">{file.file_name}</p>
                         <p className="text-xs text-slate-400">
                           {file.uploaded_by_name}
-                          {file.created_date
-                            ? ` · ${format(new Date(file.created_date), "d MMM yyyy")}`
-                            : ""}
+                          {file.created_date ? ` · ${format(new Date(file.created_date), "d MMM yyyy")}` : ""}
                           {file.file_size ? ` · ${formatSize(file.file_size)}` : ""}
                         </p>
-                        {file.description && (
-                          <p className="text-xs text-slate-400 italic">
-                            {file.description}
-                          </p>
-                        )}
+                        {file.description && <p className="text-xs text-slate-400 italic">{file.description}</p>}
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {/* Buton previzualizare */}
                         {canPreview && (
-                          <button
-                            onClick={() => setPreviewFile(file)}
+                          <button onClick={() => openPreview(file)}
                             className="p-2 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-500 transition-colors"
-                            title="Deschide"
-                          >
+                            title="Previzualizează">
                             <Eye className="h-4 w-4" />
                           </button>
                         )}
-                        {/* Buton download */}
                         {file.file_url && (
-                          <a
-                            href={file.file_url}
-                            download={file.file_name}
-                            target="_blank"
-                            rel="noreferrer"
+                          <a href={file.file_url} download={file.file_name} target="_blank" rel="noreferrer"
                             className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                            title="Descarcă"
-                          >
+                            title="Descarcă">
                             <Download className="h-4 w-4" />
                           </a>
                         )}
-                        {/* Buton stergere */}
-                        <button
-                          onClick={() => {
-                            if (confirm("Ștergi fișierul?")) deleteMutation.mutate(file.id);
-                          }}
+                        <button onClick={() => { if (confirm("Ștergi fișierul?")) deleteMutation.mutate(file.id); }}
                           className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-                          title="Șterge"
-                        >
+                          title="Șterge">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -274,16 +233,12 @@ export default function Files() {
 
       {/* Modal previzualizare */}
       {previewFile && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setPreviewFile(null)}
-        >
-          <Motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setPreviewFile(null)}>
+          <Motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
+            onClick={(e) => e.stopPropagation()}>
+
             {/* Header modal */}
             <div className="flex items-center justify-between p-4 border-b border-slate-100">
               <div className="flex items-center gap-3 min-w-0">
@@ -291,77 +246,54 @@ export default function Files() {
                   <FileText className="h-4 w-4 text-amber-500" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-900 truncate">
-                    {previewFile.file_name}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {formatSize(previewFile.file_size)}
-                  </p>
+                  <p className="text-sm font-semibold text-slate-900 truncate">{previewFile.file_name}</p>
+                  <p className="text-xs text-slate-400">{formatSize(previewFile.file_size)}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <a
-                  href={previewFile.file_url}
-                  download={previewFile.file_name}
-                  target="_blank"
-                  rel="noreferrer"
+                <a href={previewFile.file_url} download={previewFile.file_name} target="_blank" rel="noreferrer"
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
-                  style={{ backgroundColor: "#f59e0b" }}
-                >
+                  style={{ backgroundColor: "#f59e0b" }}>
                   <Download className="h-3.5 w-3.5" /> Descarcă
                 </a>
-                <button
-                  onClick={() => setPreviewFile(null)}
-                  className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 text-lg font-bold"
-                >
+                <button onClick={() => setPreviewFile(null)}
+                  className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 text-lg font-bold">
                   ✕
                 </button>
               </div>
             </div>
 
             {/* Continut previzualizare */}
-            <div className="flex-1 overflow-hidden bg-slate-50">
+            <div className="flex-1 overflow-hidden bg-slate-50 relative">
               {isImage(previewFile) ? (
                 <div className="h-full flex items-center justify-center p-4">
-                  <img
-                    src={previewFile.file_url}
-                    alt={previewFile.file_name}
-                    className="max-w-full max-h-full object-contain rounded-lg"
-                  />
+                  <img src={previewFile.file_url} alt={previewFile.file_name}
+                    className="max-w-full max-h-full object-contain rounded-lg" />
                 </div>
-              ) : isPDF(previewFile) ? (
-                <object
-                  data={previewFile.file_url}
-                  type="application/pdf"
-                  className="w-full h-full min-h-[600px]"
-                >
+              ) : (isPDF(previewFile) || isDoc(previewFile)) ? (
+                <>
+                  {iframeLoading && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10">
+                      <div className="h-8 w-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mb-3" />
+                      <p className="text-sm text-slate-400">Se încarcă previzualizarea...</p>
+                      <p className="text-xs text-slate-300 mt-1">Poate dura câteva secunde</p>
+                    </div>
+                  )}
                   <iframe
-                    src={previewFile.file_url}
+                    src={getGoogleViewerUrl(previewFile.file_url)}
                     className="w-full h-full min-h-[600px]"
                     title={previewFile.file_name}
                     style={{ border: "none" }}
-                  >
-                    <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center">
-                      <FileText className="h-12 w-12 mb-3 opacity-30" />
-                      <p className="text-sm">Browserul tău nu suportă vizualizarea directă a PDF-urilor.</p>
-                      <a href={previewFile.file_url} download target="_blank" rel="noreferrer"
-                         className="mt-3 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white"
-                         style={{ backgroundColor: "#f59e0b" }}>
-                        Descarcă PDF-ul pentru a-l citi
-                      </a>
-                    </div>
-                  </iframe>
-                </object>
+                    onLoad={() => setIframeLoading(false)}
+                  />
+                </>
               ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-slate-400">
                   <FileText className="h-12 w-12 mb-3 opacity-30" />
                   <p className="text-sm">Previzualizare indisponibilă</p>
-                  <a
-                    href={previewFile.file_url}
-                    download={previewFile.file_name}
+                  <a href={previewFile.file_url} download={previewFile.file_name}
                     className="mt-3 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white"
-                    style={{ backgroundColor: "#f59e0b" }}
-                  >
+                    style={{ backgroundColor: "#f59e0b" }}>
                     <Download className="h-4 w-4" /> Descarcă fișierul
                   </a>
                 </div>
